@@ -52,3 +52,10 @@ powershell -ExecutionPolicy Bypass -File PT_system/webapp/stop-tunnel.ps1
 ### 중요
 - 이 방식은 매번 터널 실행 필요 없음
 - 서버가 항상 켜져 있으므로 휴대폰에서 URL만 열면 사용 가능
+
+## 4) Render 무료 배포 주의사항
+
+- `render.yaml`은 현재 무료 인스턴스용(`plan: free`)으로 설정됨.
+- 무료 배포는 카드 등록 없이 가능한 계정도 있지만, Render 정책/계정 상태에 따라 결제수단이 요구될 수 있음.
+- 배포 서버 저장 경로는 Render 서버 내부 경로이며, 로컬 Obsidian(`C:\Users\saero\iCloudDrive\rara\rara\PT_data`)에 즉시 저장되지 않음.
+- 로컬 Obsidian 자동 반영이 필요하면 배포 후 별도 동기화(GitHub/Supabase 등) 설정이 추가로 필요.
