@@ -387,18 +387,24 @@ function maybeSyncToGitHub(memberFolder, fileName, content) {
 }
 function previewNote(payload) {
   const built = buildNote(payload);
-  return { markdown: built.markdown, corrections: built.corrections };
+  const checked = spellCheckMarkdown(built.markdown);
+  return { markdown: checked.text, corrections: checked.corrections };
 }
 
 function saveNote(payload) {
   ensurePtData();
   const built = buildNote(payload);
+  const checked = spellCheckMarkdown(built.markdown);
   const folder = resolveMemberFolder(built.member);
   const absDir = path.join(PT_DATA_DIR, folder);
   if (!fs.existsSync(absDir)) fs.mkdirSync(absDir, { recursive: true });
   const target = uniquePath(absDir, built.fileName);
-  fs.writeFileSync(target, built.markdown, 'utf8');
-  return { savedPath: target, corrections: built.corrections };
+  fs.writeFileSync(target, checked.text, 'utf8');
+
+  const finalName = path.basename(target);
+  const sync = maybeSyncToGitHub(folder, finalName, checked.text);
+
+  return { savedPath: target, corrections: checked.corrections, sync };
 }
 
 function serveStatic(req, res) {
@@ -502,6 +508,7 @@ server.listen(PORT, HOST, () => {
     console.log('- Mobile URL not found. Check network connection.');
   }
 });
+
 
 
 
