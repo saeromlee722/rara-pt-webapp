@@ -1,0 +1,71 @@
+﻿<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RARA PT Note Builder</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="bg-orb orb-a"></div>
+  <div class="bg-orb orb-b"></div>
+
+  <main class="app">
+    <header class="app-header panel">
+      <p class="eyebrow">RARA WORKBENCH</p>
+      <h1>PT 수업노트 스튜디오</h1>
+      <p class="subtitle">입력 → 미리보기 → 저장까지 한 화면에서 처리</p>
+      <p id="networkInfo" class="network-info"></p>
+    </header>
+
+    <section class="panel form-panel">
+      <div class="section-title">
+        <h2>입력</h2>
+        <span class="pill">실시간 자동완성</span>
+      </div>
+
+      <label for="dateInput">날짜</label>
+      <input id="dateInput" type="date" />
+
+      <label for="memberSelect">회원</label>
+      <div class="member-row">
+        <select id="memberSelect"></select>
+        <input id="newMemberInput" type="text" placeholder="새 회원 이름" />
+        <button id="addMemberBtn" type="button">회원 추가</button>
+      </div>
+
+      <label for="exerciseInput">운동 동작 추가</label>
+      <div class="exercise-row">
+        <input id="exerciseInput" type="text" list="exerciseList" placeholder="예: 스미" />
+        <datalist id="exerciseList"></datalist>
+        <button id="addExerciseBtn" type="button">추가</button>
+      </div>
+
+      <ul id="exerciseChips" class="chips"></ul>
+
+      <label for="specialInput">특이사항</label>
+      <textarea id="specialInput" rows="4" placeholder="예: 대퇴골 안정성 부족, 외전하는 힘 부족"></textarea>
+
+      <div class="actions">
+        <button id="previewBtn" type="button" class="primary">미리보기</button>
+        <button id="saveBtn" type="button" class="accent">확인 후 저장</button>
+      </div>
+
+      <p id="statusText" class="status"></p>
+    </section>
+
+    <section class="panel preview-panel">
+      <div class="section-title">
+        <h2>미리보기</h2>
+        <span class="pill neutral">Markdown</span>
+      </div>
+      <div id="previewBox" class="preview markdown-preview"></div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+
+
+

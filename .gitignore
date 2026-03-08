@@ -1,0 +1,14 @@
+﻿# runtime logs
+*.log
+PT_system/webapp/*.log
+PT_system/webapp/node.*.log
+PT_system/webapp/tunnel*.log
+
+# local tunnel/tool binaries
+PT_system/webapp/tools/cloudflared*.exe
+PT_system/webapp/tools/cloudflared-release.json
+
+# OS/editor
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,219 @@
+{
+  "main": {
+    "id": "805941f99b021be4",
+    "type": "split",
+    "children": [
+      {
+        "id": "14d1d761ddf14043",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "50772078cfcac3c9",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Welcome.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Welcome"
+            }
+          },
+          {
+            "id": "7e0ff6ad069b865e",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "PT_system/00_Inbox/2026-02-12_윤남주_raw.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "2026-02-12_윤남주_raw"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "46c5db4f4f708815",
+    "type": "split",
+    "children": [
+      {
+        "id": "84f03206a629c75e",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "aa65933b458b827f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "dbe3a4a02fe20ac7",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0803cf50ae6ff5cf",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "fada9230149bb582",
+    "type": "split",
+    "children": [
+      {
+        "id": "1d47558f0db60007",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cd60a54fa5116b39",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Welcome.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Welcome"
+            }
+          },
+          {
+            "id": "915e0cbac79825bf",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Welcome.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Welcome"
+            }
+          },
+          {
+            "id": "eef94cdca94fd39e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "5e5bc17fd1ef8e3e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "bd1bbc6dcf3cdfa8",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Welcome.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Welcome"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "7e0ff6ad069b865e",
+  "lastOpenFiles": [
+    "skills/calorie-calculator/calculate.py.tmp.25312.1771268081172",
+    "skills/calorie-calculator/calculate.py.tmp.25312.1771268077382",
+    "skills/calorie-calculator/calculate.py.tmp.25312.1771268073657",
+    "skills/calorie-calculator/calculate.py.tmp.25312.1771268069430",
+    "skills/calorie-calculator/calculate.py.tmp.25312.1771268065885",
+    "skills/calorie-calculator/output/summary_all.csv",
+    "skills/calorie-calculator/output/최대한.csv",
+    "skills/calorie-calculator/output/정수진.csv",
+    "skills/calorie-calculator/output/박민수.csv",
+    "skills/calorie-calculator/output/이영희.csv",
+    "skills/calorie-calculator/output/김철수.csv",
+    "skills/calorie-calculator/README.md",
+    "Untitled.md",
+    "PT_system/00_Inbox/2026-02-12_윤남주_raw.md",
+    "Welcome.md"
+  ]
+}

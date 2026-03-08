@@ -1,0 +1,18 @@
+﻿services:
+  - type: web
+    name: rara-pt-webapp
+    runtime: node
+    plan: starter
+    autoDeploy: true
+    buildCommand: ""
+    startCommand: "npm start"
+    healthCheckPath: /healthz
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: PT_DATA_DIR
+        value: /data/PT_data
+    disk:
+      name: pt-data
+      mountPath: /data
+      sizeGB: 1

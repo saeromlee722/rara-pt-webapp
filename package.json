@@ -1,0 +1,9 @@
+﻿{
+  "name": "rara-pt-webapp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "RARA PT webapp",
+  "scripts": {
+    "start": "node PT_system/webapp/server.js"
+  }
+}
