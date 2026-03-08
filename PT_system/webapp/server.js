@@ -219,7 +219,7 @@ function spellCheckMarkdown(text) {
     { pattern: /않되/g, replace: '안 되', label: '않되 → 안 되' },
     { pattern: /안되/g, replace: '안 돼', label: '안되 → 안 돼' },
     { pattern: /되는대/g, replace: '되는데', label: '되는대 → 되는데' },
-    { pattern: /\s{2,}/g, replace: ' ', label: '연속 공백 정리' },
+    { pattern: /[ \t]{2,}/g, replace: ' ', label: '연속 공백 정리' },
   ];
 
   for (const r of rules) {
@@ -508,6 +508,7 @@ server.listen(PORT, HOST, () => {
     console.log('- Mobile URL not found. Check network connection.');
   }
 });
+
 
 
 
