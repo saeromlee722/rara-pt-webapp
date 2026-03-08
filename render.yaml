@@ -10,3 +10,17 @@
     envVars:
       - key: HOST
         value: 0.0.0.0
+      - key: GIT_SYNC_ENABLED
+        value: true
+      - key: GIT_SYNC_REPO
+        value: https://github.com/saeromlee722/rara-pt-webapp.git
+      - key: GIT_SYNC_BRANCH
+        value: main
+      - key: GIT_SYNC_BASE_DIR
+        value: PT_data
+      - key: GIT_SYNC_AUTHOR_NAME
+        value: RARA PT Bot
+      - key: GIT_SYNC_AUTHOR_EMAIL
+        value: saeromlee722@users.noreply.github.com
+      - key: GIT_SYNC_TOKEN
+        sync: false

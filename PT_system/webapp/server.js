@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawnSync } = require('child_process');
 
 const APP_DIR = __dirname;
 const ROOT = path.resolve(APP_DIR, '..', '..');
@@ -9,6 +10,14 @@ const PUBLIC_DIR = path.join(APP_DIR, 'public');
 const PT_DATA_DIR = process.env.PT_DATA_DIR || path.join(ROOT, 'PT_data');
 const PORT = Number(process.env.PORT || 4173);
 const HOST = process.env.HOST || '0.0.0.0';
+
+const GIT_SYNC_ENABLED = String(process.env.GIT_SYNC_ENABLED || '').toLowerCase() === 'true' || String(process.env.GIT_SYNC_ENABLED || '') === '1';
+const GIT_SYNC_REPO = process.env.GIT_SYNC_REPO || '';
+const GIT_SYNC_BRANCH = process.env.GIT_SYNC_BRANCH || 'main';
+const GIT_SYNC_TOKEN = process.env.GIT_SYNC_TOKEN || '';
+const GIT_SYNC_BASE_DIR = process.env.GIT_SYNC_BASE_DIR || 'PT_data';
+const GIT_SYNC_AUTHOR_NAME = process.env.GIT_SYNC_AUTHOR_NAME || 'RARA PT Bot';
+const GIT_SYNC_AUTHOR_EMAIL = process.env.GIT_SYNC_AUTHOR_EMAIL || 'rara-pt-bot@users.noreply.github.com';
 
 function getLanUrls(port) {
   const urls = [];
@@ -329,7 +338,53 @@ function uniquePath(dir, fileName) {
     i += 1;
   }
 }
+function runGit(args, cwd) {
+  const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (r.error) throw r.error;
+  if (r.status !== 0) {
+    throw new Error((r.stderr || r.stdout || 'git command failed').trim());
+  }
+  return r.stdout || '';
+}
 
+function maybeSyncToGitHub(memberFolder, fileName, content) {
+  if (!GIT_SYNC_ENABLED) return { enabled: false, synced: false, reason: 'sync_disabled' };
+  if (!GIT_SYNC_REPO || !GIT_SYNC_TOKEN) return { enabled: true, synced: false, reason: 'missing_repo_or_token' };
+
+  const stamp = Date.now().toString() + '-' + Math.random().toString(16).slice(2);
+  const workDir = path.join(os.tmpdir(), 'rara-pt-sync-' + stamp);
+
+  try {
+    const authedRepo = GIT_SYNC_REPO.replace('https://', 'https://x-access-token:' + encodeURIComponent(GIT_SYNC_TOKEN) + '@');
+
+    runGit(['clone', '--depth', '1', '--branch', GIT_SYNC_BRANCH, authedRepo, workDir], process.cwd());
+
+    runGit(['config', 'user.name', GIT_SYNC_AUTHOR_NAME], workDir);
+    runGit(['config', 'user.email', GIT_SYNC_AUTHOR_EMAIL], workDir);
+
+    const rel = path.join(GIT_SYNC_BASE_DIR, memberFolder, fileName);
+    const abs = path.join(workDir, rel);
+    fs.mkdirSync(path.dirname(abs), { recursive: true });
+    fs.writeFileSync(abs, content, 'utf8');
+
+    runGit(['add', rel], workDir);
+
+    const diff = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: workDir, encoding: 'utf8' });
+    if (diff.status === 0) {
+      return { enabled: true, synced: true, reason: 'no_changes' };
+    }
+
+    const message = 'sync: ' + memberFolder + '/' + fileName;
+    runGit(['commit', '-m', message], workDir);
+    runGit(['push', 'origin', GIT_SYNC_BRANCH], workDir);
+
+    return { enabled: true, synced: true, reason: 'pushed' };
+  } catch (err) {
+    return { enabled: true, synced: false, reason: String(err.message || err) };
+  } finally {
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {}
+  }
+}
 function previewNote(payload) {
   const built = buildNote(payload);
   return { markdown: built.markdown, corrections: built.corrections };
@@ -426,7 +481,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && req.url === '/api/save') {
       const body = await readBody(req);
       const result = saveNote(body);
-      sendJson(res, 200, { ok: true, savedPath: result.savedPath, corrections: result.corrections });
+      sendJson(res, 200, { ok: true, savedPath: result.savedPath, corrections: result.corrections, sync: result.sync });
       return;
     }
 
@@ -447,6 +502,10 @@ server.listen(PORT, HOST, () => {
     console.log('- Mobile URL not found. Check network connection.');
   }
 });
+
+
+
+
 
 
 
