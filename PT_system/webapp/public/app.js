@@ -1,6 +1,7 @@
 ﻿const state = {
   members: [],
   exercises: [],
+  notes: [],
 };
 
 const dateInput = document.getElementById('dateInput');
@@ -17,6 +18,9 @@ const saveBtn = document.getElementById('saveBtn');
 const previewBox = document.getElementById('previewBox');
 const statusText = document.getElementById('statusText');
 const networkInfo = document.getElementById('networkInfo');
+const noteSearchInput = document.getElementById('noteSearchInput');
+const loadNotesBtn = document.getElementById('loadNotesBtn');
+const noteList = document.getElementById('noteList');
 
 function setToday() {
   const now = new Date();
@@ -183,6 +187,68 @@ function renderChips() {
   });
 }
 
+function renderNoteList() {
+  noteList.innerHTML = '';
+  if (!state.notes.length) {
+    const li = document.createElement('li');
+    li.className = 'note-empty';
+    li.textContent = '조회된 노트가 없습니다.';
+    noteList.appendChild(li);
+    return;
+  }
+
+  state.notes.forEach(note => {
+    const li = document.createElement('li');
+
+    const file = document.createElement('div');
+    file.className = 'note-file';
+    file.textContent = note.fileName;
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'danger';
+    del.textContent = '삭제';
+    del.addEventListener('click', async () => {
+      const ok = confirm('정말 삭제할까?\n' + note.fileName);
+      if (!ok) return;
+      await deleteNote(note.fileName);
+    });
+
+    li.appendChild(file);
+    li.appendChild(del);
+    noteList.appendChild(li);
+  });
+}
+
+async function loadNotes() {
+  const member = memberSelect.value;
+  if (!member) {
+    state.notes = [];
+    renderNoteList();
+    return;
+  }
+
+  const q = noteSearchInput.value.trim();
+  const data = await api(`/api/notes?member=${encodeURIComponent(member)}&q=${encodeURIComponent(q)}`);
+  state.notes = data.notes || [];
+  renderNoteList();
+}
+
+async function deleteNote(fileName) {
+  try {
+    setStatus('삭제 중...');
+    const data = await api('/api/notes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ member: memberSelect.value, fileName }),
+    });
+    const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
+    setStatus(`삭제 완료: ${data.deletedPath}${syncMsg}`);
+    await loadNotes();
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+}
 async function loadMembers() {
   const data = await api('/api/members');
   state.members = data.members;
@@ -230,6 +296,7 @@ addMemberBtn.addEventListener('click', async () => {
     memberSelect.value = data.member;
     newMemberInput.value = '';
     setStatus('회원 추가 완료');
+    await loadNotes();
   } catch (e) {
     setStatus(e.message, true);
   }
@@ -244,6 +311,21 @@ exerciseInput.addEventListener('keydown', e => {
 });
 exerciseInput.addEventListener('input', () => {
   loadExerciseSuggestions(exerciseInput.value).catch(() => {});
+});
+
+memberSelect.addEventListener('change', () => {
+  loadNotes().catch(e => setStatus(e.message, true));
+});
+
+loadNotesBtn.addEventListener('click', () => {
+  loadNotes().catch(e => setStatus(e.message, true));
+});
+
+noteSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    loadNotes().catch(err => setStatus(err.message, true));
+  }
 });
 
 previewBtn.addEventListener('click', async () => {
@@ -280,10 +362,17 @@ saveBtn.addEventListener('click', async () => {
   await loadSystemInfo();
   await loadMembers();
   await loadExerciseSuggestions('');
+  await loadNotes();
   if (state.members.length === 0) {
     setStatus('먼저 회원을 추가해줘.');
   }
 })();
+
+
+
+
+
+
 
 
 

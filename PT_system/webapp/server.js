@@ -338,6 +338,31 @@ function uniquePath(dir, fileName) {
     i += 1;
   }
 }
+function listMemberNotes(member, q) {
+  const normalized = normalizeMemberName(member);
+  if (!normalized) throw new Error('회원 이름이 비어 있습니다.');
+
+  const folder = resolveMemberFolder(normalized);
+  const absDir = path.join(PT_DATA_DIR, folder);
+  if (!fs.existsSync(absDir)) return { member: folder, notes: [] };
+
+  const query = String(q || '').trim();
+  const notes = fs.readdirSync(absDir, { withFileTypes: true })
+    .filter(d => d.isFile() && d.name.endsWith('.md'))
+    .map(d => {
+      const fullPath = path.join(absDir, d.name);
+      const stat = fs.statSync(fullPath);
+      return {
+        fileName: d.name,
+        fullPath,
+        updatedAt: stat.mtime.toISOString(),
+      };
+    })
+    .filter(n => !query || n.fileName.includes(query))
+    .sort((a, b) => b.fileName.localeCompare(a.fileName, 'ko'));
+
+  return { member: folder, notes };
+}
 function runGit(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   if (r.error) throw r.error;
@@ -385,6 +410,42 @@ function maybeSyncToGitHub(memberFolder, fileName, content) {
     try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {}
   }
 }
+function maybeDeleteFromGitHub(memberFolder, fileName) {
+  if (!GIT_SYNC_ENABLED) return { enabled: false, synced: false, reason: 'sync_disabled' };
+  if (!GIT_SYNC_REPO || !GIT_SYNC_TOKEN) return { enabled: true, synced: false, reason: 'missing_repo_or_token' };
+
+  const stamp = Date.now().toString() + '-' + Math.random().toString(16).slice(2);
+  const workDir = path.join(os.tmpdir(), 'rara-pt-sync-del-' + stamp);
+
+  try {
+    const authedRepo = GIT_SYNC_REPO.replace('https://', 'https://x-access-token:' + encodeURIComponent(GIT_SYNC_TOKEN) + '@');
+
+    runGit(['clone', '--depth', '1', '--branch', GIT_SYNC_BRANCH, authedRepo, workDir], process.cwd());
+    runGit(['config', 'user.name', GIT_SYNC_AUTHOR_NAME], workDir);
+    runGit(['config', 'user.email', GIT_SYNC_AUTHOR_EMAIL], workDir);
+
+    const rel = path.join(GIT_SYNC_BASE_DIR, memberFolder, fileName);
+    const abs = path.join(workDir, rel);
+    if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
+
+    runGit(['add', '-A', rel], workDir);
+
+    const diff = spawnSync('git', ['diff', '--cached', '--quiet'], { cwd: workDir, encoding: 'utf8' });
+    if (diff.status === 0) {
+      return { enabled: true, synced: true, reason: 'no_changes' };
+    }
+
+    const message = 'delete: ' + memberFolder + '/' + fileName;
+    runGit(['commit', '-m', message], workDir);
+    runGit(['push', 'origin', GIT_SYNC_BRANCH], workDir);
+
+    return { enabled: true, synced: true, reason: 'pushed' };
+  } catch (err) {
+    return { enabled: true, synced: false, reason: String(err.message || err) };
+  } finally {
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {}
+  }
+}
 function previewNote(payload) {
   const built = buildNote(payload);
   const checked = spellCheckMarkdown(built.markdown);
@@ -407,6 +468,27 @@ function saveNote(payload) {
   return { savedPath: target, corrections: checked.corrections, sync };
 }
 
+function deleteNote(payload) {
+  ensurePtData();
+
+  const normalized = normalizeMemberName(payload.member);
+  const fileName = String(payload.fileName || '').trim();
+  if (!normalized) throw new Error('회원 이름이 비어 있습니다.');
+  if (!fileName || fileName.includes('/') || fileName.includes('\\')) {
+    throw new Error('삭제 파일명이 올바르지 않습니다.');
+  }
+
+  const folder = resolveMemberFolder(normalized);
+  const absDir = path.join(PT_DATA_DIR, folder);
+  const target = path.join(absDir, fileName);
+  if (!target.startsWith(absDir)) throw new Error('삭제 경로가 올바르지 않습니다.');
+  if (!fs.existsSync(target)) throw new Error('파일이 존재하지 않습니다.');
+
+  fs.rmSync(target, { force: true });
+  const sync = maybeDeleteFromGitHub(folder, fileName);
+
+  return { deletedPath: target, sync };
+}
 function serveStatic(req, res) {
   let target = req.url === '/' ? '/index.html' : req.url;
   target = target.split('?')[0];
@@ -477,6 +559,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && req.url.startsWith('/api/notes')) {
+      const u = new URL(req.url, 'http://localhost');
+      const member = u.searchParams.get('member') || '';
+      const q = u.searchParams.get('q') || '';
+      const result = listMemberNotes(member, q);
+      sendJson(res, 200, result);
+      return;
+    }
     if (req.method === 'POST' && req.url === '/api/preview') {
       const body = await readBody(req);
       const result = previewNote(body);
@@ -491,6 +581,12 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'DELETE' && req.url === '/api/notes') {
+      const body = await readBody(req);
+      const result = deleteNote(body);
+      sendJson(res, 200, { ok: true, deletedPath: result.deletedPath, sync: result.sync });
+      return;
+    }
     serveStatic(req, res);
   } catch (err) {
     sendJson(res, 500, { error: String(err.message || err) });
@@ -508,6 +604,13 @@ server.listen(PORT, HOST, () => {
     console.log('- Mobile URL not found. Check network connection.');
   }
 });
+
+
+
+
+
+
+
 
 
 

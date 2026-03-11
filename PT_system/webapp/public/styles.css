@@ -362,3 +362,63 @@ button.accent {
   color: #1f5a44;
   font-weight: 600;
 }
+
+button.ghost {
+  color: #2b3a33;
+  background: #f2f5f3;
+  border-color: #d3ddd7;
+}
+
+.note-admin {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px dashed #cfddd2;
+}
+
+.note-admin-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.note-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.note-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid #d7e1db;
+  border-radius: 10px;
+  background: #f9fcfa;
+}
+
+.note-file {
+  font-size: 13px;
+  color: #223028;
+  word-break: break-all;
+}
+
+.note-empty {
+  font-size: 13px;
+  color: #66776f;
+  padding: 10px 2px;
+}
+
+button.danger {
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 9px;
+  color: #fff;
+  border-color: #8f2f2f;
+  background: linear-gradient(180deg, #c44747, #9b3434);
+}
