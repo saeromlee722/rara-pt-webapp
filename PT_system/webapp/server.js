@@ -18,6 +18,30 @@ const GIT_SYNC_TOKEN = process.env.GIT_SYNC_TOKEN || '';
 const GIT_SYNC_BASE_DIR = process.env.GIT_SYNC_BASE_DIR || 'PT_data';
 const GIT_SYNC_AUTHOR_NAME = process.env.GIT_SYNC_AUTHOR_NAME || 'RARA PT Bot';
 const GIT_SYNC_AUTHOR_EMAIL = process.env.GIT_SYNC_AUTHOR_EMAIL || 'rara-pt-bot@users.noreply.github.com';
+const LEARN_DIR = path.join(APP_DIR, 'data');
+const LEARN_DB_PATH = path.join(LEARN_DIR, 'movement_overrides.json');
+const MOVEMENT_DB_PATH = path.join(LEARN_DIR, 'movement_db.json');
+const GPT_API_ENABLED = String(process.env.GPT_API_ENABLED || '').toLowerCase() === 'true' || String(process.env.GPT_API_ENABLED || '') === '1';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS || 25000);
+
+const PATTERN_KEYS = [
+  'hinge',
+  'squat',
+  'split',
+  'hipext',
+  'abduction',
+  'adduction',
+  'pushh',
+  'pushv',
+  'pullh',
+  'pullv',
+  'scap',
+  'arm',
+  'core',
+  'general',
+];
 
 function getLanUrls(port) {
   const urls = [];
@@ -71,6 +95,220 @@ function normalizeMemberName(member) {
 
 function plainMember(member) {
   return member.endsWith('님') ? member.slice(0, -1) : member;
+}
+
+function normalizeMovementKey(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function ensureLearnDb() {
+  if (!fs.existsSync(LEARN_DIR)) fs.mkdirSync(LEARN_DIR, { recursive: true });
+  if (!fs.existsSync(LEARN_DB_PATH)) {
+    fs.writeFileSync(LEARN_DB_PATH, JSON.stringify({ overrides: {}, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+  }
+}
+
+function readLearnDb() {
+  ensureLearnDb();
+  try {
+    const raw = fs.readFileSync(LEARN_DB_PATH, 'utf8');
+    const json = JSON.parse(raw);
+    if (!json || typeof json !== 'object') return { overrides: {}, updatedAt: null };
+    if (!json.overrides || typeof json.overrides !== 'object') json.overrides = {};
+    return json;
+  } catch {
+    return { overrides: {}, updatedAt: null };
+  }
+}
+
+function writeLearnDb(db) {
+  ensureLearnDb();
+  fs.writeFileSync(
+    LEARN_DB_PATH,
+    JSON.stringify({ overrides: db.overrides || {}, updatedAt: new Date().toISOString() }, null, 2),
+    'utf8'
+  );
+}
+
+function learnMovementPattern(exercise, pattern) {
+  const cleanExercise = String(exercise || '').trim();
+  const cleanPattern = String(pattern || '').trim();
+  if (!cleanExercise) throw new Error('운동명이 비어 있습니다.');
+  if (!PATTERN_KEYS.includes(cleanPattern)) throw new Error('유효하지 않은 패턴입니다.');
+
+  const key = normalizeMovementKey(cleanExercise);
+  if (!key) throw new Error('운동명이 올바르지 않습니다.');
+
+  const db = readLearnDb();
+  db.overrides[key] = cleanPattern;
+  writeLearnDb(db);
+  return { exercise: cleanExercise, pattern: cleanPattern };
+}
+
+function getLearnedPatterns(q) {
+  const query = normalizeMovementKey(q || '');
+  const db = readLearnDb();
+  const items = Object.entries(db.overrides || {})
+    .map(([key, pattern]) => ({ key, pattern }))
+    .filter(item => !query || item.key.includes(query))
+    .sort((a, b) => a.key.localeCompare(b.key, 'ko'));
+  return { items, updatedAt: db.updatedAt || null };
+}
+
+function readMovementDb() {
+  try {
+    if (!fs.existsSync(MOVEMENT_DB_PATH)) return { exercises: [] };
+    const raw = fs.readFileSync(MOVEMENT_DB_PATH, 'utf8');
+    const json = JSON.parse(raw);
+    if (!json || typeof json !== 'object' || !Array.isArray(json.exercises)) {
+      return { exercises: [] };
+    }
+    return json;
+  } catch {
+    return { exercises: [] };
+  }
+}
+
+function findMovementMeta(exerciseName) {
+  const key = normalizeMovementKey(exerciseName);
+  if (!key) return null;
+  const db = readMovementDb();
+  for (const ex of db.exercises || []) {
+    const names = [ex.name, ...(Array.isArray(ex.aliases) ? ex.aliases : [])];
+    for (const n of names) {
+      if (normalizeMovementKey(n) === key) return ex;
+    }
+  }
+  return null;
+}
+
+function sanitizeExercises(list) {
+  return Array.isArray(list) ? list.map(x => String(x || '').trim()).filter(Boolean) : [];
+}
+
+function getMovementContext(exercises) {
+  return sanitizeExercises(exercises).map(name => {
+    const meta = findMovementMeta(name);
+    return {
+      name,
+      movementPattern: meta?.movementPattern || getPattern(name),
+      purpose: Array.isArray(meta?.exercisePurpose) ? meta.exercisePurpose : [],
+      coachingPoints: Array.isArray(meta?.coachingPoints) ? meta.coachingPoints : [],
+      sensationKeywords: Array.isArray(meta?.sensationKeywords) ? meta.sensationKeywords : [],
+      commonErrors: Array.isArray(meta?.commonErrors) ? meta.commonErrors : [],
+      nextExerciseLinks: Array.isArray(meta?.nextExerciseLinks) ? meta.nextExerciseLinks : [],
+    };
+  });
+}
+
+function extractResponseText(json) {
+  if (!json || typeof json !== 'object') return '';
+  if (typeof json.output_text === 'string' && json.output_text.trim()) return json.output_text.trim();
+  if (Array.isArray(json.output)) {
+    const parts = [];
+    for (const item of json.output) {
+      if (!item || !Array.isArray(item.content)) continue;
+      for (const c of item.content) {
+        if (typeof c?.text === 'string') parts.push(c.text);
+      }
+    }
+    const merged = parts.join('\n').trim();
+    if (merged) return merged;
+  }
+  return '';
+}
+
+async function generateNoteWithGpt(payload, fallbackMarkdown) {
+  if (!GPT_API_ENABLED) throw new Error('gpt_disabled');
+  if (!OPENAI_API_KEY) throw new Error('missing_openai_key');
+  if (typeof fetch !== 'function') throw new Error('fetch_not_available');
+
+  const exercises = sanitizeExercises(payload.exercises);
+  const movementContext = getMovementContext(exercises);
+  const systemPrompt = [
+    '너는 라라 PT 수업노트 생성 엔진이다.',
+    '반드시 코치 메모형 한국어로 작성한다.',
+    '출력은 마크다운이며 아래 섹션 순서를 지킨다:',
+    '1) 오늘 루틴 핵심 테마',
+    '2) 운동 루틴 + 동작별 체감 키워드',
+    '3) 오늘 루틴 핵심 정리',
+    '4) 예상 근육통 부위 안내',
+    '5) 다음 수업 방향',
+    '문장은 짧고 명확하게 작성한다.',
+    '운동별 목적/포인트/체감 키워드는 반드시 포함한다.'
+  ].join('\n');
+
+  const userPayload = {
+    date: payload.date,
+    member: payload.member,
+    exercises,
+    special: payload.special || '',
+    movementContext
+  };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+  try {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
+          {
+            role: 'user',
+            content: [{
+              type: 'input_text',
+              text: [
+                '다음 입력으로 수업노트를 생성해줘.',
+                JSON.stringify(userPayload, null, 2),
+                '참고용 기존 규칙 기반 초안:',
+                fallbackMarkdown
+              ].join('\n\n')
+            }]
+          }
+        ]
+      }),
+      signal: controller.signal,
+    });
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = json?.error?.message || `openai_http_${res.status}`;
+      throw new Error(msg);
+    }
+
+    const text = extractResponseText(json);
+    if (!text) throw new Error('empty_gpt_output');
+    return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function generateNoteMarkdown(payload) {
+  const built = buildNote(payload);
+  const fallbackChecked = spellCheckMarkdown(built.markdown);
+
+  try {
+    const gptMarkdown = await generateNoteWithGpt(payload, fallbackChecked.text);
+    const checked = spellCheckMarkdown(gptMarkdown);
+    return { markdown: checked.text, corrections: checked.corrections, engine: 'gpt' };
+  } catch (err) {
+    return {
+      markdown: fallbackChecked.text,
+      corrections: fallbackChecked.corrections,
+      engine: 'rule',
+      gptError: String(err?.message || err),
+    };
+  }
 }
 
 function getMembers() {
@@ -131,17 +369,30 @@ function parseDate(raw) {
 }
 
 function getPattern(ex) {
+  const learned = readLearnDb().overrides || {};
+  const key = normalizeMovementKey(ex);
+  if (key && learned[key]) return learned[key];
+
+  const meta = findMovementMeta(ex);
+  if (meta && typeof meta.movementPattern === 'string' && PATTERN_KEYS.includes(meta.movementPattern)) {
+    return meta.movementPattern;
+  }
+
+  if (/카프레이즈|calf/.test(ex)) return 'squat';
+  if (/레그컬|leg\\s*curl|햄스트링.*컬/.test(ex)) return 'hipext';
   if (/트라이셉|삼두|이두|컬|로프/.test(ex)) return 'arm';
   if (/힙.*킥백|글루트.*킥백/.test(ex)) return 'hipext';
+  if (/몬스터.*글루트|글루트.*어브덕|힙.*어브덕|어브덕션/.test(ex)) return 'abduction';
+  // Shoulder/overhead presses must be matched before generic "프레스"
+  if (/숄더|어깨|오버헤드|바이킹.*프레스|프론트.*프레스|Y프레스|레터럴|레이즈/.test(ex)) return 'pushv';
   if (/쉬러그|페이스풀|전거근|Y레이즈/.test(ex)) return 'scap';
   if (/굿모닝|데드리프트|RDL|루마니안|스티프/.test(ex)) return 'hinge';
   if (/아웃타이|abduction|크램쉘|어브덕/.test(ex)) return 'abduction';
   if (/힙쓰러스트|브릿지|킥백/.test(ex)) return 'hipext';
   if (/스플릿|불가리안|런지|스텝업|니업/.test(ex)) return 'split';
-  if (/스쿼트|레그프레스|브이스쿼트|월스쿼트/.test(ex)) return 'squat';
+  if (/스쿼트|레그프레스|브이스쿼트|브이스퀏트|월스쿼트/.test(ex)) return 'squat';
   if (/이너타이|내전|요가블럭/.test(ex)) return 'adduction';
   if (/체스트|푸쉬업|플라이|프레스/.test(ex)) return 'pushh';
-  if (/숄더|레이즈|Y프레스|오버헤드/.test(ex)) return 'pushv';
   if (/미드로우|하이로우|로우|벤트오버/.test(ex)) return 'pullh';
   if (/랫풀|풀다운|암풀다운|맥그립|로터리/.test(ex)) return 'pullv';
   if (/플랭크|데드버그|코어|팔로프/.test(ex)) return 'core';
@@ -249,7 +500,49 @@ function buildNote(payload) {
 
   const profiles = exercises.map(name => {
     const pattern = getPattern(name);
-    return { name, pattern, data: PROFILES[pattern] || PROFILES.general };
+    const base = PROFILES[pattern] || PROFILES.general;
+    const meta = findMovementMeta(name);
+
+    if (!meta) return { name, pattern, data: base };
+
+    const metaPurpose = Array.isArray(meta.exercisePurpose) && meta.exercisePurpose.length > 0
+      ? meta.exercisePurpose.join(' + ')
+      : base.purpose;
+    const metaPoints = Array.isArray(meta.coachingPoints) && meta.coachingPoints.length > 0
+      ? meta.coachingPoints
+      : base.points;
+    const metaKeywords = Array.isArray(meta.sensationKeywords) && meta.sensationKeywords.length > 0
+      ? meta.sensationKeywords
+      : base.keywords;
+    const metaMuscles = [
+      ...(Array.isArray(meta.primaryTargetMuscles) ? meta.primaryTargetMuscles : []),
+      ...(Array.isArray(meta.secondaryMuscles) ? meta.secondaryMuscles : []),
+    ];
+    const metaSignals = Array.isArray(meta.commonErrors) && meta.commonErrors.length > 0
+      ? meta.commonErrors
+      : base.signals;
+    const metaNext = Array.isArray(meta.nextExerciseLinks) && meta.nextExerciseLinks.length > 0
+      ? `${meta.nextExerciseLinks.join(' + ')} 연결`
+      : base.next;
+    const metaTag = typeof meta.movementPattern === 'string' && meta.movementPattern
+      ? meta.movementPattern
+      : base.tag;
+
+    return {
+      name,
+      pattern,
+      data: {
+        theme: base.theme,
+        tag: metaTag,
+        purpose: metaPurpose,
+        points: metaPoints,
+        keywords: metaKeywords,
+        muscles: metaMuscles.length > 0 ? metaMuscles : base.muscles,
+        feelings: metaKeywords,
+        signals: metaSignals,
+        next: metaNext,
+      },
+    };
   });
 
   const adj = specialAdj(payload.special);
@@ -446,26 +739,30 @@ function maybeDeleteFromGitHub(memberFolder, fileName) {
     try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {}
   }
 }
-function previewNote(payload) {
-  const built = buildNote(payload);
-  const checked = spellCheckMarkdown(built.markdown);
-  return { markdown: checked.text, corrections: checked.corrections };
+async function previewNote(payload) {
+  return await generateNoteMarkdown(payload);
 }
 
-function saveNote(payload) {
+async function saveNote(payload) {
   ensurePtData();
+  const generated = await generateNoteMarkdown(payload);
   const built = buildNote(payload);
-  const checked = spellCheckMarkdown(built.markdown);
   const folder = resolveMemberFolder(built.member);
   const absDir = path.join(PT_DATA_DIR, folder);
   if (!fs.existsSync(absDir)) fs.mkdirSync(absDir, { recursive: true });
   const target = uniquePath(absDir, built.fileName);
-  fs.writeFileSync(target, checked.text, 'utf8');
+  fs.writeFileSync(target, generated.markdown, 'utf8');
 
   const finalName = path.basename(target);
-  const sync = maybeSyncToGitHub(folder, finalName, checked.text);
+  const sync = maybeSyncToGitHub(folder, finalName, generated.markdown);
 
-  return { savedPath: target, corrections: checked.corrections, sync };
+  return {
+    savedPath: target,
+    corrections: generated.corrections,
+    sync,
+    engine: generated.engine,
+    gptError: generated.gptError || null,
+  };
 }
 
 function deleteNote(payload) {
@@ -559,6 +856,26 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && req.url.startsWith('/api/patterns')) {
+      const u = new URL(req.url, 'http://localhost');
+      const result = getLearnedPatterns(u.searchParams.get('q') || '');
+      sendJson(res, 200, { patternKeys: PATTERN_KEYS, ...result });
+      return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/movement-db') {
+      const db = readMovementDb();
+      sendJson(res, 200, { count: (db.exercises || []).length, exercises: db.exercises || [] });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/patterns/learn') {
+      const body = await readBody(req);
+      const result = learnMovementPattern(body.exercise, body.pattern);
+      sendJson(res, 200, { ok: true, ...result });
+      return;
+    }
+
     if (req.method === 'GET' && req.url.startsWith('/api/notes')) {
       const u = new URL(req.url, 'http://localhost');
       const member = u.searchParams.get('member') || '';
@@ -569,15 +886,22 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && req.url === '/api/preview') {
       const body = await readBody(req);
-      const result = previewNote(body);
+      const result = await previewNote(body);
       sendJson(res, 200, result);
       return;
     }
 
     if (req.method === 'POST' && req.url === '/api/save') {
       const body = await readBody(req);
-      const result = saveNote(body);
-      sendJson(res, 200, { ok: true, savedPath: result.savedPath, corrections: result.corrections, sync: result.sync });
+      const result = await saveNote(body);
+      sendJson(res, 200, {
+        ok: true,
+        savedPath: result.savedPath,
+        corrections: result.corrections,
+        sync: result.sync,
+        engine: result.engine,
+        gptError: result.gptError,
+      });
       return;
     }
 

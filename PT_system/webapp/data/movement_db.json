@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "exercises": [
+    {
+      "name": "몬스터 글루트 머신",
+      "aliases": ["힙 어브덕션", "몬스터글루트머신"],
+      "exerciseRole": "activation",
+      "movementPattern": "abduction",
+      "primaryTargetMuscles": ["중둔근"],
+      "secondaryMuscles": ["대둔근 상부", "TFL"],
+      "exercisePurpose": ["중둔근 활성", "골반 안정", "무릎 외전 패턴 확보", "스쿼트 안정"],
+      "coachingPoints": ["골반 흔들림 금지", "허리 개입 금지", "엉덩이 옆으로 벌리기", "반동 사용 금지", "상단 1~2초 정지"],
+      "sensationKeywords": ["엉덩이 옆 타는 느낌", "골반 옆 자극", "무릎 바깥 힘 유지"],
+      "commonErrors": ["허리 반동 사용", "허벅지 바깥 과사용", "골반 회전", "범위만 크게 만들기"],
+      "correctionEffects": ["무릎 valgus 감소", "런지 안정 증가", "스쿼트 무릎 정렬 개선"],
+      "routinePosition": "activation",
+      "nextExerciseLinks": ["스쿼트", "런지", "힙쓰러스트"]
+    },
+    {
+      "name": "힙쓰러스트 머신",
+      "aliases": ["힙쓰러스트"],
+      "exerciseRole": "main glute exercise",
+      "movementPattern": "hipext",
+      "primaryTargetMuscles": ["대둔근"],
+      "secondaryMuscles": ["햄스트링", "중둔근"],
+      "exercisePurpose": ["둔근 최대 수축", "힙 신전 강화", "후면 사슬 강화"],
+      "coachingPoints": ["상단 1~2초 정지", "골반 말아 올리기", "허리 과신전 금지", "발바닥 전체 접지"],
+      "sensationKeywords": ["엉덩이 꽉 조이는 느낌", "둔근 수축", "허벅지 개입 최소"],
+      "commonErrors": ["허리 과신전", "무릎 벌어짐", "반동 사용"],
+      "correctionEffects": ["힙 파워 증가", "스쿼트 보조", "런지 안정"],
+      "routinePosition": "main exercise",
+      "nextExerciseLinks": ["런지", "레그프레스", "힙힌지"]
+    },
+    {
+      "name": "스티프 데드리프트",
+      "aliases": ["stiff deadlift", "스티프 데드"],
+      "exerciseRole": "posterior chain",
+      "movementPattern": "hinge",
+      "primaryTargetMuscles": ["햄스트링"],
+      "secondaryMuscles": ["둔근", "척추기립근"],
+      "exercisePurpose": ["햄스트링 강화", "힙힌지 패턴 형성", "후면 사슬 강화"],
+      "coachingPoints": ["무릎 살짝 고정", "엉덩이 뒤로 이동", "허리 중립 유지"],
+      "sensationKeywords": ["허벅지 뒤 늘어남", "엉덩이 아래 자극"],
+      "commonErrors": ["허리 굽힘", "무릎 과굴곡", "상체만 숙이기"],
+      "correctionEffects": ["힙힌지 패턴 개선", "스쿼트 보조"],
+      "routinePosition": "main / secondary",
+      "nextExerciseLinks": ["힙쓰러스트", "런지"]
+    },
+    {
+      "name": "브이스쿼트 머신 굿모닝",
+      "aliases": ["브이스퀏트 머신 굿모닝", "v squat good morning"],
+      "exerciseRole": "secondary",
+      "movementPattern": "hinge",
+      "primaryTargetMuscles": ["햄스트링", "대둔근"],
+      "secondaryMuscles": ["척추기립근"],
+      "exercisePurpose": ["힙힌지 패턴 강화", "둔근·햄스트링 연결"],
+      "coachingPoints": ["무릎 각도 고정", "엉덩이 뒤로 길게 이동", "허리 중립 유지"],
+      "sensationKeywords": ["허벅지 뒤 길게 늘어남", "엉덩이 아래 묵직함", "허리 부담 없음"],
+      "commonErrors": ["허리 굽힘", "무릎 굴곡 과다", "상체만 숙이기"],
+      "correctionEffects": ["후면 사슬 사용 증가", "힙힌지 정교화"],
+      "routinePosition": "secondary",
+      "nextExerciseLinks": ["런지", "힙쓰러스트"]
+    },
+    {
+      "name": "펜듈럼 스쿼트",
+      "aliases": ["pendulum squat"],
+      "exerciseRole": "main exercise",
+      "movementPattern": "squat",
+      "primaryTargetMuscles": ["대퇴사두", "대둔근"],
+      "secondaryMuscles": ["내전근", "중둔근"],
+      "exercisePurpose": ["하체 스쿼트 패턴 강화", "대퇴사두 + 둔근 협응"],
+      "coachingPoints": ["발바닥 전체 접지", "무릎-발 방향 유지", "하단 깊이 안정", "올라올 때 둔근 사용"],
+      "sensationKeywords": ["허벅지 앞 단단함", "엉덩이 같이 사용", "무릎 안정감"],
+      "commonErrors": ["무릎 안쪽 붕괴", "발 아치 붕괴", "허리 과신전"],
+      "correctionEffects": ["스쿼트 패턴 안정", "하체 정렬 개선"],
+      "routinePosition": "main",
+      "nextExerciseLinks": ["힙힌지", "힙쓰러스트"]
+    }
+  ]
+}

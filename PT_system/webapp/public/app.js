@@ -21,6 +21,10 @@ const networkInfo = document.getElementById('networkInfo');
 const noteSearchInput = document.getElementById('noteSearchInput');
 const loadNotesBtn = document.getElementById('loadNotesBtn');
 const noteList = document.getElementById('noteList');
+const learnExerciseInput = document.getElementById('learnExerciseInput');
+const learnPatternSelect = document.getElementById('learnPatternSelect');
+const learnSaveBtn = document.getElementById('learnSaveBtn');
+const learnStatus = document.getElementById('learnStatus');
 
 function setToday() {
   const now = new Date();
@@ -28,6 +32,23 @@ function setToday() {
   const localISO = new Date(now - tzOffsetMs).toISOString().slice(0, 10);
   dateInput.value = localISO;
 }
+
+const patternLabels = {
+  hinge: '힙힌지',
+  squat: '스쿼트/하체',
+  split: '런지/한쪽지지',
+  hipext: '힙신전/둔근',
+  abduction: '외전/중둔근',
+  adduction: '내전/중심선',
+  pushh: '수평밀기(가슴)',
+  pushv: '수직밀기(어깨)',
+  pullh: '수평당기기(로우)',
+  pullv: '수직당기기(랫)',
+  scap: '견갑안정',
+  arm: '팔고립',
+  core: '코어',
+  general: '기타',
+};
 
 
 async function loadSystemInfo() {
@@ -282,6 +303,38 @@ function setStatus(text, isError = false) {
   statusText.style.color = isError ? '#b91c1c' : '#56635c';
 }
 
+function setLearnStatus(text, isError = false) {
+  learnStatus.textContent = text;
+  learnStatus.style.color = isError ? '#b91c1c' : '#56635c';
+}
+
+async function loadPatternKeys() {
+  const data = await api('/api/patterns');
+  learnPatternSelect.innerHTML = '';
+  (data.patternKeys || []).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = patternLabels[key] || key;
+    learnPatternSelect.appendChild(opt);
+  });
+}
+
+async function saveLearnPattern() {
+  const exercise = learnExerciseInput.value.trim() || exerciseInput.value.trim();
+  const pattern = learnPatternSelect.value;
+  if (!exercise) {
+    setLearnStatus('운동명을 입력해줘.', true);
+    return;
+  }
+
+  const data = await api('/api/patterns/learn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exercise, pattern }),
+  });
+  setLearnStatus(`학습 저장 완료: ${data.exercise} -> ${patternLabels[data.pattern] || data.pattern}`);
+}
+
 addMemberBtn.addEventListener('click', async () => {
   try {
     const member = newMemberInput.value.trim();
@@ -311,6 +364,11 @@ exerciseInput.addEventListener('keydown', e => {
 });
 exerciseInput.addEventListener('input', () => {
   loadExerciseSuggestions(exerciseInput.value).catch(() => {});
+  if (!learnExerciseInput.value.trim()) learnExerciseInput.value = exerciseInput.value;
+});
+
+learnSaveBtn.addEventListener('click', () => {
+  saveLearnPattern().catch(e => setLearnStatus(e.message, true));
 });
 
 memberSelect.addEventListener('change', () => {
@@ -337,7 +395,9 @@ previewBtn.addEventListener('click', async () => {
       body: JSON.stringify(payload()),
     });
     previewBox.innerHTML = renderMarkdown(data.markdown);
-    setStatus('미리보기 완료');
+    const engine = data.engine === 'gpt' ? 'GPT' : 'RULE';
+    const msg = data.gptError ? ` (${data.gptError})` : '';
+    setStatus(`미리보기 완료 [${engine}]${msg}`);
   } catch (e) {
     setStatus(e.message, true);
   }
@@ -351,7 +411,11 @@ saveBtn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload()),
     });
-    setStatus(`완료: ${data.savedPath}`);
+    const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
+    const engine = data.engine === 'gpt' ? 'GPT' : 'RULE';
+    const gptMsg = data.gptError ? ` | gpt:${data.gptError}` : '';
+    setStatus(`완료[${engine}]: ${data.savedPath}${syncMsg}${gptMsg}`);
+    if (typeof loadNotes === 'function') await loadNotes();
   } catch (e) {
     setStatus(e.message, true);
   }
@@ -362,6 +426,7 @@ saveBtn.addEventListener('click', async () => {
   await loadSystemInfo();
   await loadMembers();
   await loadExerciseSuggestions('');
+  await loadPatternKeys();
   await loadNotes();
   if (state.members.length === 0) {
     setStatus('먼저 회원을 추가해줘.');

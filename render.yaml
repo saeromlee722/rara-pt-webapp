@@ -24,3 +24,11 @@
         value: saeromlee722@users.noreply.github.com
       - key: GIT_SYNC_TOKEN
         sync: false
+      - key: GPT_API_ENABLED
+        value: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: OPENAI_TIMEOUT_MS
+        value: 25000
+      - key: OPENAI_API_KEY
+        sync: false
