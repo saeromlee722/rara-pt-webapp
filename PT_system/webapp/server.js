@@ -41,6 +41,7 @@ const PATTERN_KEYS = [
   'arm',
   'core',
   'general',
+  'fly'
 ];
 
 function getLanUrls(port) {
@@ -225,36 +226,16 @@ function extractResponseText(json) {
 
 function validateGptNote(markdown, exercises) {
   const text = String(markdown || '');
-  const required = [
-    '오늘 루틴 핵심 테마',
-    '운동 루틴 + 🔑 디테일 코칭',
-    '오늘 핵심 피드백',
-    '예상 근육통',
-    '체크 포인트',
-    '다음 수업 방향',
-    '오늘 한 줄 정리',
-  ];
-  for (const r of required) {
-    if (!text.includes(r)) return { ok: false, reason: `missing_section:${r}` };
-  }
+  if (text.length < 300) return { ok: false, reason: 'too_short' };
 
-  const headings = (text.match(/^###\s+\d+️⃣\s+/gm) || []).length;
+  const headings = (text.match(/\d+️⃣\s+/gm) || []).length;
   if (headings < (Array.isArray(exercises) ? exercises.length : 0)) {
     return { ok: false, reason: 'missing_exercise_blocks' };
   }
 
-  // Minimum richness check per exercise block
-  const blocks = text.split(/^###\s+\d+️⃣\s+/gm).slice(1);
-  if (blocks.length < (Array.isArray(exercises) ? exercises.length : 0)) {
-    return { ok: false, reason: 'invalid_block_split' };
-  }
-  for (const b of blocks) {
-    const plain = b.replace(/\s+/g, ' ').trim();
-    if (plain.length < 180) return { ok: false, reason: 'exercise_block_too_short' };
-    const mustHave = ['🧠 역할', '🎯 목적', '🔧 코칭 포인트', '🔑 체감 키워드', '⚠ 흔한 오류', '👉 다음 운동 연결'];
-    for (const m of mustHave) {
-      if (!b.includes(m)) return { ok: false, reason: `missing_block_field:${m}` };
-    }
+  const mustHave = ['🧠 역할', '🔧 코칭 포인트', '🔑 체감 키워드', '⚠ 흔한 오류'];
+  for (const m of mustHave) {
+    if (!text.includes(m)) return { ok: false, reason: `missing_field:${m}` };
   }
 
   return { ok: true, reason: 'ok' };
@@ -287,7 +268,7 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   '',
   '(운동 개수만큼 아래 블록 반복)',
   '',
-  ' n️⃣ 운동명',
+  '### n️⃣ 운동명',
   '',
   ' 🧠 역할',
   '이 운동이 오늘 루틴에서 하는 역할 한 줄',
@@ -518,7 +499,8 @@ function getPattern(ex) {
   if (/스플릿|불가리안|런지|스텝업|니업/.test(ex)) return 'split';
   if (/스쿼트|레그프레스|브이스쿼트|브이스퀏트|월스쿼트/.test(ex)) return 'squat';
   if (/이너타이|내전|요가블럭/.test(ex)) return 'adduction';
-  if (/체스트|푸쉬업|플라이|프레스/.test(ex)) return 'pushh';
+  if (/플라이|펙덱|케이블크로스|체스트플라이/.test(ex)) return 'fly';
+  if (/체스트|푸쉬업|프레스/.test(ex)) return 'pushh';
   if (/미드로우|하이로우|로우|벤트오버/.test(ex)) return 'pullh';
   if (/랫풀|풀다운|암풀다운|맥그립|로터리/.test(ex)) return 'pullv';
   if (/플랭크|데드버그|코어|팔로프/.test(ex)) return 'core';
@@ -540,7 +522,17 @@ const PROFILES = {
   arm: { theme: '팔 고립', tag: '팔 고립', purpose: '상완 고립 수축 + 보상 움직임 억제', points: ['팔꿈치 고정', '반동 금지', '끝 수축 유지', '천천히 이완'], keywords: ['목표 부위 펌핑', '수축 선명', '경로 일정'], muscles: ['상완이두', '상완삼두', '전완근'], feelings: ['팔 자극 선명', '수축 유지', '반동 감소'], signals: ['몸통 반동', '손목 꺾임', '관절 통증'], next: '정지 구간 + 템포 강화' },
   core: { theme: '복압 안정', tag: '코어 패턴', purpose: '복압 유지 + 분절 제어', points: ['호흡 리듬 유지', '골반 중립', '요추 과신전 금지', '코어 긴장 유지'], keywords: ['복부 내부 긴장', '몸통 흔들림 감소', '중립 유지'], muscles: ['복횡근', '복직근', '기립근 보조'], feelings: ['복부 압력 유지', '중심 안정', '허리 부담 감소'], signals: ['허리 꺾임', '호흡 끊김', '복압 유지 실패'], next: '코어 프리셋 후 메인 연결' },
   general: { theme: '패턴 안정', tag: '기본 패턴', purpose: '목표 패턴 안정 + 자극 위치 명확화', points: ['반동 사용 금지', '정렬 우선 유지', '호흡 리듬 유지', '끝지점 제어'], keywords: ['자극 부위 선명', '움직임 안정', '속도 제어'], muscles: ['전신 안정근'], feelings: ['움직임 안정감', '목표 자극 인지', '반복 품질 유지'], signals: ['타깃 외 통증', '반동 증가', '정렬 붕괴'], next: '기본 패턴 정교화' },
-};
+fly: { 
+  theme: '가슴 수평 모으기', 
+  tag: '수평 모으기', 
+  purpose: '흉근 고립 수축 + 어깨 안전 범위 유지', 
+  points: ['팔이 아니라 가슴으로 모은다', '어깨 말림 방지', '수축 지점 1초 유지', '반동 없이 컨트롤'], 
+  keywords: ['가슴 가운데 조여짐', '가슴으로 모이는 느낌', '어깨 개입 최소'], 
+  muscles: ['대흉근', '전면 삼각근 보조'], 
+  feelings: ['가슴 중앙 압박', '어깨 부담 없음', '수축 선명'], 
+  signals: ['어깨 앞으로 말림', '팔로만 모으기', '반동 사용'], 
+  next: '가슴 활성 → 프레스 또는 로우 연결' 
+},};
 
 function specialAdj(special) {
   const s = String(special || '');
