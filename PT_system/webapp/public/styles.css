@@ -210,6 +210,22 @@ button:active { transform: translateY(0); }
   margin-top: 14px;
 }
 
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2f3f36;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 button.primary {
   color: #fff;
   border-color: var(--primary-deep);

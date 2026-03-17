@@ -15,6 +15,7 @@ const exerciseChips = document.getElementById('exerciseChips');
 const specialInput = document.getElementById('specialInput');
 const previewBtn = document.getElementById('previewBtn');
 const saveBtn = document.getElementById('saveBtn');
+const useGptToggle = document.getElementById('useGptToggle');
 const previewBox = document.getElementById('previewBox');
 const statusText = document.getElementById('statusText');
 const networkInfo = document.getElementById('networkInfo');
@@ -295,6 +296,7 @@ function payload() {
     member: memberSelect.value,
     exercises: state.exercises,
     special: specialInput.value.trim(),
+    useGpt: !!useGptToggle.checked,
   };
 }
 

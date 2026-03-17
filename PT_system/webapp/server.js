@@ -296,6 +296,16 @@ async function generateNoteWithGpt(payload, fallbackMarkdown) {
 async function generateNoteMarkdown(payload) {
   const built = buildNote(payload);
   const fallbackChecked = spellCheckMarkdown(built.markdown);
+  const useGpt = payload && payload.useGpt === true;
+
+  if (!useGpt) {
+    return {
+      markdown: fallbackChecked.text,
+      corrections: fallbackChecked.corrections,
+      engine: 'rule',
+      gptError: null,
+    };
+  }
 
   try {
     const gptMarkdown = await generateNoteWithGpt(payload, fallbackChecked.text);
