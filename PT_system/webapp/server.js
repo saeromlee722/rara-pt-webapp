@@ -90,6 +90,8 @@ function ensurePtData() {
 function normalizeMemberName(member) {
   const clean = String(member || '').trim();
   if (!clean) return '';
+  if (/\(\d{4}\)\s*$/.test(clean)) return clean;
+  if (clean.includes('님')) return clean;
   return clean.endsWith('님') ? clean : `${clean}님`;
 }
 
@@ -221,7 +223,44 @@ function extractResponseText(json) {
   return '';
 }
 
-async function generateNoteWithGpt(payload, fallbackMarkdown) {
+function validateGptNote(markdown, exercises) {
+  const text = String(markdown || '');
+  const required = [
+    '오늘 루틴 핵심 테마',
+    '운동 루틴 + 🔑 디테일 코칭',
+    '오늘 핵심 피드백',
+    '예상 근육통',
+    '체크 포인트',
+    '다음 수업 방향',
+    '오늘 한 줄 정리',
+  ];
+  for (const r of required) {
+    if (!text.includes(r)) return { ok: false, reason: `missing_section:${r}` };
+  }
+
+  const headings = (text.match(/^###\s+\d+️⃣\s+/gm) || []).length;
+  if (headings < (Array.isArray(exercises) ? exercises.length : 0)) {
+    return { ok: false, reason: 'missing_exercise_blocks' };
+  }
+
+  // Minimum richness check per exercise block
+  const blocks = text.split(/^###\s+\d+️⃣\s+/gm).slice(1);
+  if (blocks.length < (Array.isArray(exercises) ? exercises.length : 0)) {
+    return { ok: false, reason: 'invalid_block_split' };
+  }
+  for (const b of blocks) {
+    const plain = b.replace(/\s+/g, ' ').trim();
+    if (plain.length < 180) return { ok: false, reason: 'exercise_block_too_short' };
+    const mustHave = ['🧠 역할', '🎯 목적', '🔧 코칭 포인트', '🔑 체감 키워드', '⚠ 흔한 오류', '👉 다음 운동 연결'];
+    for (const m of mustHave) {
+      if (!b.includes(m)) return { ok: false, reason: `missing_block_field:${m}` };
+    }
+  }
+
+  return { ok: true, reason: 'ok' };
+}
+
+async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction = '') {
   if (!GPT_API_ENABLED) throw new Error('gpt_disabled');
   if (!OPENAI_API_KEY) throw new Error('missing_openai_key');
   if (typeof fetch !== 'function') throw new Error('fetch_not_available');
@@ -230,15 +269,38 @@ async function generateNoteWithGpt(payload, fallbackMarkdown) {
   const movementContext = getMovementContext(exercises);
   const systemPrompt = [
     '너는 라라 PT 수업노트 생성 엔진이다.',
-    '반드시 코치 메모형 한국어로 작성한다.',
-    '출력은 마크다운이며 아래 섹션 순서를 지킨다:',
-    '1) 오늘 루틴 핵심 테마',
-    '2) 운동 루틴 + 동작별 체감 키워드',
-    '3) 오늘 루틴 핵심 정리',
-    '4) 예상 근육통 부위 안내',
-    '5) 다음 수업 방향',
-    '문장은 짧고 명확하게 작성한다.',
-    '운동별 목적/포인트/체감 키워드는 반드시 포함한다.'
+    '출력은 반드시 한국어 마크다운.',
+    '코치 메모형 문장으로 짧고 명확하게 작성한다.',
+    '설명형 장문, 교과서식 문장 금지.',
+    '',
+    '반드시 아래 섹션 순서와 제목을 그대로 사용:',
+    '# 💪 YYYY.MM.DD 요일 회원명 수업 노트',
+    '## 🧠 오늘 루틴 핵심 테마',
+    '---',
+    '# 🏋️‍♀️ 운동 루틴 + 🔑 디테일 코칭',
+    '(운동 블록 반복)',
+    '# 📌 오늘 핵심 피드백',
+    '# ⭐ 예상 근육통',
+    '# ⚠ 체크 포인트',
+    '# 📌 다음 수업 방향',
+    '# 💡 오늘 한 줄 정리',
+    '',
+    '운동마다 반드시 아래 구조를 포함:',
+    '## n️⃣ 운동명',
+    '🧠 역할',
+    '🎯 목적',
+    '🔧 코칭 포인트 (최소 4개)',
+    '🔑 체감 키워드 (최소 3개)',
+    '⚠ 흔한 오류 (최소 3개)',
+    '👉 다음 운동 연결',
+    '',
+    '중요:',
+    '- 운동명은 입력 순서 그대로',
+    '- 하체/상체 맥락을 혼동하지 말 것',
+    '- 회원이 바로 이해 가능한 감각 언어 사용',
+    '- 불필요한 영어 혼용 최소화 (운동명 제외)',
+    '- 각 운동 블록은 샘플처럼 역할/목적/포인트/체감/오류/연결을 충분히 구체적으로 작성',
+    '- 로우/풀다운 계열은 팔 개입 최소, 견갑 순서, 등 체감 중심으로 작성'
   ].join('\n');
 
   const userPayload = {
@@ -270,11 +332,14 @@ async function generateNoteWithGpt(payload, fallbackMarkdown) {
                 '다음 입력으로 수업노트를 생성해줘.',
                 JSON.stringify(userPayload, null, 2),
                 '참고용 기존 규칙 기반 초안:',
-                fallbackMarkdown
+                fallbackMarkdown,
+                extraInstruction ? `추가 지시:\n${extraInstruction}` : ''
               ].join('\n\n')
             }]
           }
         ]
+        ,
+        max_output_tokens: 1800
       }),
       signal: controller.signal,
     });
@@ -308,7 +373,19 @@ async function generateNoteMarkdown(payload) {
   }
 
   try {
-    const gptMarkdown = await generateNoteWithGpt(payload, fallbackChecked.text);
+    let gptMarkdown = await generateNoteWithGpt(payload, fallbackChecked.text);
+    let check = validateGptNote(gptMarkdown, payload.exercises);
+
+    if (!check.ok) {
+      gptMarkdown = await generateNoteWithGpt(
+        payload,
+        fallbackChecked.text,
+        `이전 출력 문제: ${check.reason}. 반드시 섹션/운동 블록을 완전하게 다시 생성해.`
+      );
+      check = validateGptNote(gptMarkdown, payload.exercises);
+      if (!check.ok) throw new Error(`gpt_quality_check_failed:${check.reason}`);
+    }
+
     const checked = spellCheckMarkdown(gptMarkdown);
     return { markdown: checked.text, corrections: checked.corrections, engine: 'gpt' };
   } catch (err) {
