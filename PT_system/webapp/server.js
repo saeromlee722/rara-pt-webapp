@@ -331,7 +331,7 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
               text: [
                 '다음 입력으로 수업노트를 생성해줘.',
                 JSON.stringify(userPayload, null, 2),
-                '참고용 기존 규칙 기반 초안:',
+                '아래는 운동 맥락 참고용 초안이다. 내용(운동명, 근육, 코칭 포인트)은 참고하되, 형식은 반드시 위 시스템 프롬프트 구조를 따를 것:',
                 fallbackMarkdown,
                 extraInstruction ? `추가 지시:\n${extraInstruction}` : ''
               ].join('\n\n')
@@ -339,7 +339,7 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
           }
         ]
         ,
-        max_output_tokens: 1800
+        max_output_tokens: 3500
       }),
       signal: controller.signal,
     });
