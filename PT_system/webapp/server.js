@@ -723,7 +723,7 @@ function buildNote(payload) {
   lines.push(`👉 **"${themes[0]} 중심 패턴을 다음 수업까지 유지하는 날"**`);
 
   const markdown = lines.join('\n');
-  const fileName = `💪 ${displayDate} ${member} 수업 노트.md`;
+  const fileName = `💪 ${displayDate} ${weekday} ${member} 수업 노트.md`;
 
   return { markdown, member, fileName };
 }
