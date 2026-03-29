@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --bg-0: #f5f1e8;
   --bg-1: #edf4ee;
   --panel: rgba(255, 255, 255, 0.86);
@@ -266,6 +266,17 @@ button.accent {
   background: #fff;
 }
 
+.chip-label {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip-edit {
+  color: #2b3a33;
+}
+
 .preview {
   margin: 0;
   max-height: 76vh;
@@ -482,3 +493,4 @@ button.danger {
     grid-template-columns: 1fr;
   }
 }
+

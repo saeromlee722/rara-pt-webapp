@@ -1,7 +1,8 @@
-﻿const state = {
+const state = {
   members: [],
   exercises: [],
   notes: [],
+  learnedPatterns: {},
 };
 
 const dateInput = document.getElementById('dateInput');
@@ -95,6 +96,21 @@ function formatInline(text) {
   return out;
 }
 
+function normalizeMovementKey(text) {
+  return String(text || '').toLowerCase().replace(/\s+/g, '').trim();
+}
+function syncLearnPanel(exerciseName) {
+  const key = normalizeMovementKey(exerciseName);
+  const learned = state.learnedPatterns[key];
+  if (learned) {
+    learnPatternSelect.value = learned;
+    setLearnStatus(`\uD559\uC2B5\uB428: ${exerciseName.trim()} -> ${patternLabels[learned] || learned}`);
+    return;
+  }
+  if (learnStatus.textContent.startsWith('\uD559\uC2B5\uB428:')) {
+    setLearnStatus('');
+  }
+}
 function renderMarkdown(markdown) {
   const lines = String(markdown || '').split(/\r?\n/);
   const html = [];
@@ -201,15 +217,32 @@ function renderChips() {
   exerciseChips.innerHTML = '';
   state.exercises.forEach((name, idx) => {
     const li = document.createElement('li');
-    li.textContent = name;
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.textContent = 'x';
-    del.addEventListener('click', () => {
+    const label = document.createElement('span');
+    label.className = 'chip-label';
+    label.textContent = name;
+    const editBtn = document.createElement('button');
+    editBtn.className = 'chip-edit';
+    editBtn.type = 'button';
+    editBtn.textContent = '\uC218\uC815';
+    editBtn.addEventListener('click', () => {
+      const next = window.prompt('\uC6B4\uB3D9 \uC774\uB984 \uC218\uC815', name);
+      if (!next) return;
+      const trimmed = next.trim();
+      if (!trimmed) return;
+      state.exercises[idx] = trimmed;
+      renderChips();
+      syncLearnPanel(trimmed);
+    });
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = 'x';
+    delBtn.addEventListener('click', () => {
       state.exercises.splice(idx, 1);
       renderChips();
     });
-    li.appendChild(del);
+    li.appendChild(label);
+    li.appendChild(editBtn);
+    li.appendChild(delBtn);
     exerciseChips.appendChild(li);
   });
 }
@@ -390,6 +423,10 @@ function setLearnStatus(text, isError = false) {
 
 async function loadPatternKeys() {
   const data = await api('/api/patterns');
+  state.learnedPatterns = {};
+  (data.items || []).forEach(item => {
+    state.learnedPatterns[item.key] = item.pattern;
+  });
   learnPatternSelect.innerHTML = '';
   (data.patternKeys || []).forEach(key => {
     const opt = document.createElement('option');
@@ -445,6 +482,11 @@ exerciseInput.addEventListener('keydown', e => {
 exerciseInput.addEventListener('input', () => {
   loadExerciseSuggestions(exerciseInput.value).catch(() => {});
   if (!learnExerciseInput.value.trim()) learnExerciseInput.value = exerciseInput.value;
+  syncLearnPanel(exerciseInput.value);
+});
+
+learnExerciseInput.addEventListener('input', () => {
+  syncLearnPanel(learnExerciseInput.value);
 });
 
 learnSaveBtn.addEventListener('click', () => {
@@ -523,6 +565,9 @@ saveBtn.addEventListener('click', async () => {
     setStatus('먼저 회원을 추가해줘.');
   }
 })();
+
+
+
 
 
 
