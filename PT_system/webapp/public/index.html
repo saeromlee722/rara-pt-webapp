@@ -59,7 +59,7 @@
 
       <div class="note-admin">
         <div class="section-title">
-          <h2>조회/삭제</h2>
+          <h2>조회/수정/삭제</h2>
           <span class="pill neutral">회원별 파일</span>
         </div>
         <div class="note-admin-row">
@@ -67,6 +67,17 @@
           <button id="loadNotesBtn" type="button" class="ghost">조회</button>
         </div>
         <ul id="noteList" class="note-list"></ul>
+        <div id="noteEditPanel" class="note-edit-panel hidden">
+          <div class="section-title">
+            <h2>노트 수정</h2>
+            <span id="noteEditFileName" class="pill neutral">선택된 파일 없음</span>
+          </div>
+          <textarea id="noteEditTextarea" rows="14" placeholder="선택한 노트 내용이 여기에 표시됩니다."></textarea>
+          <div class="note-edit-actions">
+            <button id="noteEditSaveBtn" type="button" class="primary">수정 저장</button>
+            <button id="noteEditCancelBtn" type="button" class="ghost">취소</button>
+          </div>
+        </div>
       </div>
 
       <div class="learn-admin">

@@ -22,6 +22,11 @@ const networkInfo = document.getElementById('networkInfo');
 const noteSearchInput = document.getElementById('noteSearchInput');
 const loadNotesBtn = document.getElementById('loadNotesBtn');
 const noteList = document.getElementById('noteList');
+const noteEditPanel = document.getElementById('noteEditPanel');
+const noteEditFileName = document.getElementById('noteEditFileName');
+const noteEditTextarea = document.getElementById('noteEditTextarea');
+const noteEditSaveBtn = document.getElementById('noteEditSaveBtn');
+const noteEditCancelBtn = document.getElementById('noteEditCancelBtn');
 const learnExerciseInput = document.getElementById('learnExerciseInput');
 const learnPatternSelect = document.getElementById('learnPatternSelect');
 const learnSaveBtn = document.getElementById('learnSaveBtn');
@@ -226,6 +231,17 @@ function renderNoteList() {
     file.className = 'note-file';
     file.textContent = note.fileName;
 
+    const actions = document.createElement('div');
+    actions.className = 'note-item-actions';
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'ghost';
+    edit.textContent = '수정';
+    edit.addEventListener('click', async () => {
+      await openEditNote(note.fileName);
+    });
+
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'danger';
@@ -236,10 +252,34 @@ function renderNoteList() {
       await deleteNote(note.fileName);
     });
 
+    actions.appendChild(edit);
+    actions.appendChild(del);
     li.appendChild(file);
-    li.appendChild(del);
+    li.appendChild(actions);
     noteList.appendChild(li);
   });
+}
+
+function closeEditPanel() {
+  noteEditPanel.classList.add('hidden');
+  noteEditFileName.textContent = '선택된 파일 없음';
+  noteEditTextarea.value = '';
+  state.editingFileName = null;
+}
+
+async function openEditNote(fileName) {
+  try {
+    setStatus('노트 불러오는 중...');
+    const member = memberSelect.value;
+    const data = await api(`/api/notes/content?member=${encodeURIComponent(member)}&fileName=${encodeURIComponent(fileName)}`);
+    noteEditPanel.classList.remove('hidden');
+    noteEditFileName.textContent = data.fileName;
+    noteEditTextarea.value = data.content || '';
+    state.editingFileName = data.fileName;
+    setStatus(`수정 열림: ${data.fileName}`);
+  } catch (e) {
+    setStatus(e.message, true);
+  }
 }
 
 async function loadNotes() {
@@ -266,7 +306,36 @@ async function deleteNote(fileName) {
     });
     const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
     setStatus(`삭제 완료: ${data.deletedPath}${syncMsg}`);
+    if (state.editingFileName === fileName) closeEditPanel();
     await loadNotes();
+  } catch (e) {
+    setStatus(e.message, true);
+  }
+}
+
+async function saveEditedNote() {
+  try {
+    if (!state.editingFileName) {
+      setStatus('수정할 노트를 먼저 선택해줘.', true);
+      return;
+    }
+    setStatus('수정 저장 중...');
+    const data = await api('/api/notes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        member: memberSelect.value,
+        fileName: state.editingFileName,
+        content: noteEditTextarea.value,
+      }),
+    });
+    const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
+    const correctionMsg = Array.isArray(data.corrections) && data.corrections.length
+      ? ` | 교정:${data.corrections.join(', ')}`
+      : '';
+    setStatus(`수정 저장 완료: ${data.savedPath}${syncMsg}${correctionMsg}`);
+    await loadNotes();
+    closeEditPanel();
   } catch (e) {
     setStatus(e.message, true);
   }
@@ -298,6 +367,15 @@ function payload() {
     special: specialInput.value.trim(),
     useGpt: !!useGptToggle.checked,
   };
+}
+
+function resetComposer() {
+  state.exercises = [];
+  renderChips();
+  exerciseInput.value = '';
+  specialInput.value = '';
+  previewBox.innerHTML = '';
+  setToday();
 }
 
 function setStatus(text, isError = false) {
@@ -381,6 +459,15 @@ loadNotesBtn.addEventListener('click', () => {
   loadNotes().catch(e => setStatus(e.message, true));
 });
 
+noteEditSaveBtn.addEventListener('click', () => {
+  saveEditedNote().catch(e => setStatus(e.message, true));
+});
+
+noteEditCancelBtn.addEventListener('click', () => {
+  closeEditPanel();
+  setStatus('수정을 취소했어.');
+});
+
 noteSearchInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
@@ -418,6 +505,8 @@ saveBtn.addEventListener('click', async () => {
     const gptMsg = data.gptError ? ` | gpt:${data.gptError}` : '';
     setStatus(`완료[${engine}]: ${data.savedPath}${syncMsg}${gptMsg}`);
     if (typeof loadNotes === 'function') await loadNotes();
+    closeEditPanel();
+    resetComposer();
   } catch (e) {
     setStatus(e.message, true);
   }

@@ -424,10 +424,36 @@ button.ghost {
   word-break: break-all;
 }
 
+.note-item-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .note-empty {
   font-size: 13px;
   color: #66776f;
   padding: 10px 2px;
+}
+
+.note-edit-panel {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px dashed #cfddd2;
+}
+
+.note-edit-panel.hidden {
+  display: none;
+}
+
+.note-edit-panel textarea {
+  min-height: 260px;
+}
+
+.note-edit-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 button.danger {

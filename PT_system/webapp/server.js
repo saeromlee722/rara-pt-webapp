@@ -93,11 +93,13 @@ function normalizeMemberName(member) {
   if (!clean) return '';
   if (/\(\d{4}\)\s*$/.test(clean)) return clean;
   if (clean.includes('님')) return clean;
-  return clean.endsWith('님') ? clean : `${clean}님`;
+  return clean;
 }
 
 function plainMember(member) {
-  return member.endsWith('님') ? member.slice(0, -1) : member;
+  const clean = String(member || '').trim();
+  const withoutPhone = clean.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+  return withoutPhone.endsWith('님') ? withoutPhone.slice(0, -1) : withoutPhone;
 }
 
 function normalizeMovementKey(text) {
@@ -248,6 +250,9 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
 
   const exercises = sanitizeExercises(payload.exercises);
   const movementContext = getMovementContext(exercises);
+  const dateObj = parseDate(payload.date);
+  const exactDateDisplay = `${dateObj.getFullYear()}.${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`;
+  const exactWeekday = getWeekdayKo(dateObj);
   const systemPrompt = [
   '너는 라라 PT 수업노트 생성 엔진이다.',
   '출력은 반드시 한국어 마크다운.',
@@ -317,6 +322,8 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   '',
   '=== 규칙 ===',
   '- 운동명은 입력 순서 그대로 사용',
+  '- 제목의 날짜와 요일은 사용자가 준 exactDateDisplay와 exactWeekday를 그대로 사용한다',
+  '- 요일은 절대 추론하지 말고 exactWeekday만 그대로 쓴다',
   '- 하체/상체 맥락 절대 혼동 금지',
   '- 로우/풀다운 계열: 팔 개입 최소, 견갑 순서, 등 체감 중심',
   '- 불필요한 영어 혼용 최소화 (운동명 제외)',
@@ -325,6 +332,8 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   
   const userPayload = {
     date: payload.date,
+    exactDateDisplay,
+    exactWeekday,
     member: payload.member,
     exercises,
     special: payload.special || '',
@@ -736,12 +745,18 @@ function buildNote(payload) {
 
 function resolveMemberFolder(member) {
   const plain = plainMember(member);
+  const dirs = getMembers();
+
+  const numbered = dirs.find(name => plainMember(name) === plain && /\(\d{4}\)\s*$/.test(name));
+  if (numbered) return numbered;
+
   const candidates = [member, plain, `${plain}님`];
   for (const c of candidates) {
     const p = path.join(PT_DATA_DIR, c);
     if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return c;
   }
-  return `${plain}님`;
+
+  return plain;
 }
 
 function uniquePath(dir, fileName) {
@@ -779,6 +794,30 @@ function listMemberNotes(member, q) {
     .sort((a, b) => b.fileName.localeCompare(a.fileName, 'ko'));
 
   return { member: folder, notes };
+}
+
+function getNoteContent(member, fileName) {
+  ensurePtData();
+
+  const normalized = normalizeMemberName(member);
+  const safeFileName = String(fileName || '').trim();
+  if (!normalized) throw new Error('회원 이름이 비어 있습니다.');
+  if (!safeFileName || safeFileName.includes('/') || safeFileName.includes('\\')) {
+    throw new Error('파일명이 올바르지 않습니다.');
+  }
+
+  const folder = resolveMemberFolder(normalized);
+  const absDir = path.join(PT_DATA_DIR, folder);
+  const target = path.join(absDir, safeFileName);
+  if (!target.startsWith(absDir)) throw new Error('조회 경로가 올바르지 않습니다.');
+  if (!fs.existsSync(target)) throw new Error('파일이 존재하지 않습니다.');
+
+  return {
+    member: folder,
+    fileName: safeFileName,
+    content: fs.readFileSync(target, 'utf8'),
+    fullPath: target,
+  };
 }
 function runGit(args, cwd) {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -910,6 +949,33 @@ function deleteNote(payload) {
 
   return { deletedPath: target, sync };
 }
+
+function updateNote(payload) {
+  ensurePtData();
+
+  const normalized = normalizeMemberName(payload.member);
+  const fileName = String(payload.fileName || '').trim();
+  if (!normalized) throw new Error('회원 이름이 비어 있습니다.');
+  if (!fileName || fileName.includes('/') || fileName.includes('\\')) {
+    throw new Error('수정 파일명이 올바르지 않습니다.');
+  }
+
+  const folder = resolveMemberFolder(normalized);
+  const absDir = path.join(PT_DATA_DIR, folder);
+  const target = path.join(absDir, fileName);
+  if (!target.startsWith(absDir)) throw new Error('수정 경로가 올바르지 않습니다.');
+  if (!fs.existsSync(target)) throw new Error('파일이 존재하지 않습니다.');
+
+  const checked = spellCheckMarkdown(String(payload.content || ''));
+  fs.writeFileSync(target, checked.text, 'utf8');
+  const sync = maybeSyncToGitHub(folder, fileName, checked.text);
+
+  return {
+    savedPath: target,
+    corrections: checked.corrections,
+    sync,
+  };
+}
 function serveStatic(req, res) {
   let target = req.url === '/' ? '/index.html' : req.url;
   target = target.split('?')[0];
@@ -1000,6 +1066,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && req.url.startsWith('/api/notes/content')) {
+      const u = new URL(req.url, 'http://localhost');
+      const result = getNoteContent(u.searchParams.get('member') || '', u.searchParams.get('fileName') || '');
+      sendJson(res, 200, result);
+      return;
+    }
+
     if (req.method === 'GET' && req.url.startsWith('/api/notes')) {
       const u = new URL(req.url, 'http://localhost');
       const member = u.searchParams.get('member') || '';
@@ -1033,6 +1106,18 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const result = deleteNote(body);
       sendJson(res, 200, { ok: true, deletedPath: result.deletedPath, sync: result.sync });
+      return;
+    }
+
+    if (req.method === 'PUT' && req.url === '/api/notes') {
+      const body = await readBody(req);
+      const result = updateNote(body);
+      sendJson(res, 200, {
+        ok: true,
+        savedPath: result.savedPath,
+        corrections: result.corrections,
+        sync: result.sync,
+      });
       return;
     }
     serveStatic(req, res);
