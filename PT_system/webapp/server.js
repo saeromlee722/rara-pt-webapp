@@ -609,6 +609,7 @@ function buildNote(payload) {
   const member = normalizeMemberName(payload.member);
   const dateObj = parseDate(payload.date);
   const displayDate = `${dateObj.getFullYear()}.${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`;
+  const weekday = getWeekdayKo(dateObj);
 
   const exercises = Array.isArray(payload.exercises)
     ? payload.exercises.map(x => String(x).trim()).filter(Boolean)
@@ -684,6 +685,7 @@ function buildNote(payload) {
   const nextDirs = uniq([...profiles.map(p => p.data.next), ...adj.extraNext]);
 
   const lines = [];
+  lines.push(`# 💪 ${displayDate} ${weekday} ${member} 수업 노트`, '');
   lines.push('## 🧠 오늘 루틴 핵심 테마', '');
   lines.push(`**${themes[0]} → ${themes[1]} → ${themes[2]} → ${themes[3]}**`, '');
   if (payload.special && String(payload.special).trim()) lines.push(`→ 특이사항 반영: ${String(payload.special).trim()}  `);
