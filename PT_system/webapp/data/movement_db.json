@@ -3,7 +3,18 @@
   "exercises": [
     {
       "name": "몬스터 글루트 머신",
-      "aliases": ["힙 어브덕션", "몬스터글루트머신"],
+      "aliases": [
+        "힙 어브덕션",
+        "몬스터글루트머신",
+        "몬스터 글루트 머신(중둔근)",
+        "아웃타이",
+        "아웃타이 (중둔근 타겟)",
+        "아웃타이(중둔근 타겟)",
+        "아웃타이 (힙 어브덕션 ; 중둔근 타겟)",
+        "아웃타이 (중둔근 활성화)",
+        "스탠딩 밴드 아웃타이 (힙 어브덕션)",
+        "밴드 아웃타이"
+      ],
       "exerciseRole": "activation",
       "movementPattern": "abduction",
       "primaryTargetMuscles": ["중둔근"],
@@ -18,7 +29,14 @@
     },
     {
       "name": "힙쓰러스트 머신",
-      "aliases": ["힙쓰러스트"],
+      "aliases": [
+        "힙쓰러스트",
+        "힙쓰러스트 (와이드 스탠스)",
+        "밴드 힙쓰러스트",
+        "힙 쓰러스트 (밴드)",
+        "스미스머신 힙쓰러스트",
+        "스미스 머신 힙쓰러스트"
+      ],
       "exerciseRole": "main glute exercise",
       "movementPattern": "hipext",
       "primaryTargetMuscles": ["대둔근"],
@@ -33,7 +51,15 @@
     },
     {
       "name": "스티프 데드리프트",
-      "aliases": ["stiff deadlift", "스티프 데드"],
+      "aliases": [
+        "stiff deadlift",
+        "스티프 데드",
+        "바벨 스티프 데드리프트",
+        "덤벨 스티프 데드리프트",
+        "스미스 스티프 데드리프트",
+        "이지바 스티프 데드리프트",
+        "바벨 루마니안 데드리프트"
+      ],
       "exerciseRole": "posterior chain",
       "movementPattern": "hinge",
       "primaryTargetMuscles": ["햄스트링"],
@@ -48,7 +74,11 @@
     },
     {
       "name": "브이스쿼트 머신 굿모닝",
-      "aliases": ["브이스퀏트 머신 굿모닝", "v squat good morning"],
+      "aliases": [
+        "브이스퀏트 머신 굿모닝",
+        "v squat good morning",
+        "브이스쿼트 굿모닝"
+      ],
       "exerciseRole": "secondary",
       "movementPattern": "hinge",
       "primaryTargetMuscles": ["햄스트링", "대둔근"],
@@ -63,7 +93,9 @@
     },
     {
       "name": "펜듈럼 스쿼트",
-      "aliases": ["pendulum squat"],
+      "aliases": [
+        "pendulum squat"
+      ],
       "exerciseRole": "main exercise",
       "movementPattern": "squat",
       "primaryTargetMuscles": ["대퇴사두", "대둔근"],

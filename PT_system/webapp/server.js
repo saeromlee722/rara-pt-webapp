@@ -701,27 +701,64 @@ function getExerciseSuggestions(query) {
   return all.filter(x => x.includes(q)).slice(0, 30);
 }
 
+const CANONICAL_EXERCISE_NAMES = {
+  '로우 로우머신': '로우 로우 머신',
+  '원암 플레이트 로디드 미드로우 머신': '원암 플레이트 로디드 미드 로우 머신',
+  '플레이트 로디드 미드로우 머신': '플레이트 로디드 미드 로우 머신',
+  '시티드 미드로우 (케이블)': '시티드 미드 로우 (케이블)',
+  '케이블 시티드 미드로우': '케이블 시티드 미드 로우',
+  '아이솔레이션 케이블 미드로우': '아이솔레이션 케이블 미드 로우',
+  '아이솔레이션 케이블 시티드로우': '아이솔레이션 케이블 시티드 로우',
+  '힙익스텐션': '힙 익스텐션',
+  '힙 쓰러스트 (밴드)': '밴드 힙쓰러스트',
+  '스미스머신 힙쓰러스트': '스미스 머신 힙쓰러스트',
+  '내로우그립 랫풀다운': '내로우 그립 랫풀다운',
+  '케이블 로프 페이스 풀': '케이블 로프 페이스풀',
+  '스미스 스모스쿼트': '스미스 스모 스쿼트',
+  '덤벨 스모스쿼트': '덤벨 스모 스쿼트',
+  '밴드 브이스쿼트머신': '밴드 브이스쿼트 머신',
+  '프론트 숫더 프레스': '프론트 숄더 프레스',
+  '리버스 펝덱 플라이': '리버스 펙덱 플라이',
+  '아웃타이(중둔근 타겟)': '아웃타이 (중둔근 타겟)',
+  '아웃타이 (힙 어브덕션 ; 중둔근 타겟)이': '아웃타이 (힙 어브덕션 ; 중둔근 타겟)',
+  '펙덱 플라이': '펙덱 플라이 머신',
+};
+
+function canonicalExerciseName(name) {
+  const clean = String(name || '').trim();
+  return CANONICAL_EXERCISE_NAMES[clean] || clean;
+}
+
 function getExerciseCatalog() {
   if (exerciseCatalogCache) return exerciseCatalogCache;
 
-  const set = new Set();
+  const byKey = new Map();
+  const addExerciseName = (name) => {
+    const canonical = canonicalExerciseName(name);
+    const key = normalizeMovementKey(canonical);
+    if (!key) return;
+    if (!byKey.has(key)) byKey.set(key, canonical);
+  };
+
   for (const memberDir of getMembers()) {
     const absMember = path.join(PT_DATA_DIR, memberDir);
     for (const file of fs.readdirSync(absMember, { withFileTypes: true })) {
       if (file.isFile() && file.name.endsWith('.md')) {
-        extractExercisesFromFile(path.join(absMember, file.name), set);
+        const raw = new Set();
+        extractExercisesFromFile(path.join(absMember, file.name), raw);
+        for (const name of raw) addExerciseName(name);
       }
     }
   }
 
   for (const ex of readMovementDb().exercises || []) {
-    if (ex.name) set.add(String(ex.name).trim());
+    if (ex.name) addExerciseName(ex.name);
     for (const alias of Array.isArray(ex.aliases) ? ex.aliases : []) {
-      if (alias) set.add(String(alias).trim());
+      if (alias) addExerciseName(alias);
     }
   }
 
-  exerciseCatalogCache = Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
+  exerciseCatalogCache = Array.from(byKey.values()).sort((a, b) => a.localeCompare(b, 'ko'));
   return exerciseCatalogCache;
 }
 
