@@ -35,11 +35,43 @@
       </div>
 
       <label for="exerciseInput">운동 동작 추가</label>
+      <div class="exercise-structure-row">
+        <select id="exerciseToolSelect" aria-label="운동 도구">
+          <option value="">도구 선택</option>
+          <option value="맨몸">맨몸</option>
+          <option value="덤벨">덤벨</option>
+          <option value="바벨">바벨</option>
+          <option value="케틀벨">케틀벨</option>
+          <option value="케이블">케이블</option>
+          <option value="머신">머신</option>
+          <option value="밴드">밴드</option>
+          <option value="스미스">스미스</option>
+          <option value="플레이트">플레이트</option>
+          <option value="기타">기타</option>
+        </select>
+        <select id="exerciseTargetSelect" aria-label="운동 타겟">
+          <option value="">타겟 선택</option>
+          <option value="중둔근">중둔근</option>
+          <option value="대둔근">대둔근</option>
+          <option value="햄스트링">햄스트링</option>
+          <option value="대퇴사두">대퇴사두</option>
+          <option value="내전근">내전근</option>
+          <option value="광배">광배</option>
+          <option value="등 중앙">등 중앙</option>
+          <option value="가슴">가슴</option>
+          <option value="어깨">어깨</option>
+          <option value="팔">팔</option>
+          <option value="코어">코어</option>
+          <option value="전신 안정">전신 안정</option>
+        </select>
+        <input id="exerciseVariantInput" type="text" placeholder="변형 선택 입력: 와이드, 후면섬유 등" />
+      </div>
       <div class="exercise-row">
         <input id="exerciseInput" type="text" list="exerciseList" placeholder="예: 스미" />
         <datalist id="exerciseList"></datalist>
         <button id="addExerciseBtn" type="button">추가</button>
       </div>
+      <p class="exercise-help">예: 머신 + 아웃타이 + 중둔근 → 같은 아웃타이도 타겟별로 노트가 다르게 생성돼요.</p>
 
       <ul id="exerciseChips" class="chips"></ul>
 

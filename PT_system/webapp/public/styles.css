@@ -190,6 +190,20 @@ textarea {
   grid-template-columns: 1.1fr 1fr auto;
 }
 
+.exercise-structure-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 0.8fr 0.9fr 1.2fr;
+  margin-bottom: 8px;
+}
+
+.exercise-help {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 button {
   cursor: pointer;
   font-weight: 700;
@@ -313,7 +327,8 @@ button.accent {
   }
 
   .member-row,
-  .exercise-row {
+  .exercise-row,
+  .exercise-structure-row {
     grid-template-columns: 1fr;
   }
 }

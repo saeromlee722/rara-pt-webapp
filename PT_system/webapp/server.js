@@ -379,7 +379,8 @@ function mergeMovementAlias(payload) {
 }
 
 function findMovementMeta(exerciseName) {
-  const key = normalizeMovementKey(exerciseName);
+  const item = normalizeExerciseItem(exerciseName);
+  const key = normalizeMovementKey(item.name || item.displayName);
   if (!key) return null;
   const db = readMovementDb();
   for (const ex of db.exercises || []) {
@@ -391,16 +392,48 @@ function findMovementMeta(exerciseName) {
   return null;
 }
 
+function normalizeExerciseItem(item) {
+  if (item && typeof item === 'object') {
+    const name = String(item.name || item.exercise || item.label || item.displayName || '').trim();
+    const tool = String(item.tool || item.equipment || '').trim();
+    const target = String(item.target || item.primaryTarget || '').trim();
+    const variant = String(item.variant || '').trim();
+    const details = [target, variant].filter(Boolean).join(', ');
+    const displayName = String(item.displayName || item.label || `${[tool, name].filter(Boolean).join(' ')}${details ? ` (${details})` : ''}`).trim();
+    return { name: name || displayName, tool, target, variant, displayName: displayName || name };
+  }
+
+  const displayName = String(item || '').trim();
+  const m = displayName.match(/^(.+?)\s*\((.+)\)$/);
+  return {
+    name: m ? m[1].trim() : displayName,
+    tool: '',
+    target: m ? m[2].split(',')[0].trim() : '',
+    variant: m ? m[2].split(',').slice(1).join(',').trim() : '',
+    displayName,
+  };
+}
+
+function normalizeExerciseItems(list) {
+  return Array.isArray(list)
+    ? list.map(normalizeExerciseItem).filter(item => item.displayName || item.name)
+    : [];
+}
+
 function sanitizeExercises(list) {
-  return Array.isArray(list) ? list.map(x => String(x || '').trim()).filter(Boolean) : [];
+  return normalizeExerciseItems(list).map(item => item.displayName || item.name).filter(Boolean);
 }
 
 function getMovementContext(exercises) {
-  return sanitizeExercises(exercises).map(name => {
-    const meta = findMovementMeta(name);
+  return normalizeExerciseItems(exercises).map(item => {
+    const meta = findMovementMeta(item);
     return {
-      name,
-      movementPattern: meta?.movementPattern || getPattern(name),
+      name: item.displayName || item.name,
+      baseName: item.name,
+      tool: item.tool,
+      target: item.target,
+      variant: item.variant,
+      movementPattern: meta?.movementPattern || getPattern(item.displayName || item.name),
       purpose: Array.isArray(meta?.exercisePurpose) ? meta.exercisePurpose : [],
       coachingPoints: Array.isArray(meta?.coachingPoints) ? meta.coachingPoints : [],
       sensationKeywords: Array.isArray(meta?.sensationKeywords) ? meta.sensationKeywords : [],
@@ -449,8 +482,9 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   if (!OPENAI_API_KEY) throw new Error('missing_openai_key');
   if (typeof fetch !== 'function') throw new Error('fetch_not_available');
 
-  const exercises = sanitizeExercises(payload.exercises);
-  const movementContext = getMovementContext(exercises);
+  const exerciseItems = normalizeExerciseItems(payload.exercises);
+  const exercises = exerciseItems.map(item => item.displayName || item.name);
+  const movementContext = getMovementContext(payload.exercises);
   const dateObj = parseDate(payload.date);
   const exactDateDisplay = `${dateObj.getFullYear()}.${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`;
   const exactWeekday = getWeekdayKo(dateObj);
@@ -537,6 +571,7 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
     exactWeekday,
     member: payload.member,
     exercises,
+    exerciseItems,
     special: payload.special || '',
     movementContext
   };
@@ -766,6 +801,91 @@ fly: {
   next: '가슴 활성 → 프레스 또는 로우 연결' 
 },};
 
+function targetProfileAdjust(item) {
+  const target = String(item?.target || '').trim();
+  const tool = String(item?.tool || '').trim();
+  const variant = String(item?.variant || '').trim();
+  const labelBits = [tool, target, variant].filter(Boolean);
+  const role = labelBits.length ? `${labelBits.join(' · ')} 기준으로 자극 위치를 분리해서 확인` : '';
+
+  if (/중둔근/.test(target)) {
+    return {
+      role,
+      purpose: ['골반 수평 유지', '무릎 외전 안정', '보행/싱글레그 안정 선활성'],
+      points: ['골반이 들썩이지 않게 고정', '무릎을 벌린다보다 엉덩이 옆으로 밀어낸다', '상단 1초 정지 후 천천히 복귀', '허리 반동 없이 작은 범위부터 선명하게'],
+      keywords: ['엉덩이 옆 타는 느낌', '골반이 잠기는 느낌', '무릎 바깥 힘 유지'],
+      muscles: ['중둔근', '소둔근'],
+      signals: ['TFL 과개입', '골반 회전', '허리 반동'],
+      next: '중둔근 선활성 후 스쿼트/런지 중심선 안정으로 연결',
+    };
+  }
+
+  if (/대둔근/.test(target)) {
+    return {
+      role,
+      purpose: ['고관절 신전 감각 강화', '둔근 후면 수축 선명화', '허리 보상 감소'],
+      points: ['골반을 살짝 말아 둔근으로 잠근다', '허리 꺾어서 올리지 않기', '발바닥 접지 유지', '끝지점에서 둔근 수축을 먼저 확인'],
+      keywords: ['엉덩이 뒤쪽 묵직함', '상단 둔근 잠김', '허리 부담 없음'],
+      muscles: ['대둔근', '햄스트링 보조'],
+      signals: ['허리 과신전', '햄스트링 쥐남', '골반이 먼저 풀림'],
+      next: '대둔근 수축 확인 후 힌지/스쿼트 메인 패턴으로 연결',
+    };
+  }
+
+  if (/햄스트링/.test(target)) {
+    return {
+      role,
+      purpose: ['후면 체인 텐션 형성', '골반 힌지 감각 강화', '무릎 각도 유지'],
+      points: ['엉덩이를 뒤로 접어 햄스트링을 길게 만든다', '무릎 각도는 거의 고정', '허리 중립 유지', '올라올 때 엉덩이로 바닥을 민다'],
+      keywords: ['허벅지 뒤 길어짐', '엉덩이 아래 묵직함', '허리 편안함'],
+      muscles: ['햄스트링', '대둔근'],
+      signals: ['허리 말림', '무릎 과굴곡', '반동으로 올라오기'],
+      next: '햄스트링 텐션 유지 후 둔근 수축 운동으로 연결',
+    };
+  }
+
+  if (/광배/.test(target)) {
+    return {
+      role,
+      purpose: ['견갑 하강 선행', '광배 하부 체감 형성', '팔 개입 감소'],
+      points: ['어깨를 먼저 아래로 내린다', '팔꿈치보다 겨드랑이를 닫는 느낌', '목 긴장 빼기', '당긴 뒤 갈비가 들리지 않게 유지'],
+      keywords: ['겨드랑이 아래 당겨짐', '등 하부 단단함', '어깨 들림 감소'],
+      muscles: ['광배근', '대원근'],
+      signals: ['팔로만 당김', '어깨 으쓱', '허리 젖힘'],
+      next: '광배 하강 감각을 로우/풀다운 패턴으로 연결',
+    };
+  }
+
+  if (/가슴/.test(target)) {
+    return {
+      role,
+      purpose: ['흉근 주도 수축', '어깨 앞쪽 부담 감소', '밀기 경로 안정'],
+      points: ['견갑을 먼저 안정시킨다', '팔보다 가슴으로 밀거나 모은다', '갈비 들림 금지', '수축 지점에서 1초 확인'],
+      keywords: ['가슴 중앙 압박', '어깨 앞 부담 없음', '가슴으로 미는 느낌'],
+      muscles: ['대흉근', '전면 삼각근 보조'],
+      signals: ['어깨 말림', '승모 과긴장', '허리 과신전'],
+      next: '가슴 활성 후 프레스/플라이 품질 유지',
+    };
+  }
+
+  return role ? { role } : {};
+}
+
+function mergeProfileData(base, adjust) {
+  if (!adjust || Object.keys(adjust).length === 0) return base;
+  return {
+    ...base,
+    role: adjust.role || base.role || '',
+    purpose: Array.isArray(adjust.purpose) && adjust.purpose.length ? adjust.purpose.join(' + ') : base.purpose,
+    points: Array.isArray(adjust.points) && adjust.points.length ? adjust.points : base.points,
+    keywords: Array.isArray(adjust.keywords) && adjust.keywords.length ? adjust.keywords : base.keywords,
+    muscles: Array.isArray(adjust.muscles) && adjust.muscles.length ? adjust.muscles : base.muscles,
+    feelings: Array.isArray(adjust.keywords) && adjust.keywords.length ? adjust.keywords : base.feelings,
+    signals: Array.isArray(adjust.signals) && adjust.signals.length ? adjust.signals : base.signals,
+    next: adjust.next || base.next,
+  };
+}
+
 function specialAdj(special) {
   const s = String(special || '');
   const out = { extraPoints: [], extraKeywords: [], extraSignals: [], extraNext: [], extraThemes: [] };
@@ -843,16 +963,16 @@ function buildNote(payload) {
   const displayDate = `${dateObj.getFullYear()}.${String(dateObj.getMonth() + 1).padStart(2, '0')}.${String(dateObj.getDate()).padStart(2, '0')}`;
   const weekday = getWeekdayKo(dateObj);
 
-  const exercises = Array.isArray(payload.exercises)
-    ? payload.exercises.map(x => String(x).trim()).filter(Boolean)
-    : [];
+  const exerciseItems = normalizeExerciseItems(payload.exercises);
+  const exercises = exerciseItems.map(item => item.displayName || item.name).filter(Boolean);
   if (!member) throw new Error('회원 이름이 비어 있습니다.');
   if (exercises.length === 0) throw new Error('운동 목록이 비어 있습니다.');
 
-  const profiles = exercises.map(name => {
+  const profiles = exerciseItems.map(item => {
+    const name = item.displayName || item.name;
     const pattern = getPattern(name);
-    const base = PROFILES[pattern] || PROFILES.general;
-    const meta = findMovementMeta(name);
+    const base = mergeProfileData(PROFILES[pattern] || PROFILES.general, targetProfileAdjust(item));
+    const meta = findMovementMeta(item);
 
     if (!meta) return { name, pattern, hasMeta: false, data: base };
 
@@ -884,7 +1004,7 @@ function buildNote(payload) {
       pattern,
       data: {
         theme: base.theme,
-        role: meta.exerciseRole || '',
+        role: meta.exerciseRole || base.role || '',
         tag: metaTag,
         purpose: metaPurpose,
         points: metaPoints,

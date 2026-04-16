@@ -14,6 +14,9 @@ const memberSelect = document.getElementById('memberSelect');
 const newMemberInput = document.getElementById('newMemberInput');
 const addMemberBtn = document.getElementById('addMemberBtn');
 const exerciseInput = document.getElementById('exerciseInput');
+const exerciseToolSelect = document.getElementById('exerciseToolSelect');
+const exerciseTargetSelect = document.getElementById('exerciseTargetSelect');
+const exerciseVariantInput = document.getElementById('exerciseVariantInput');
 const exerciseList = document.getElementById('exerciseList');
 const addExerciseBtn = document.getElementById('addExerciseBtn');
 const exerciseChips = document.getElementById('exerciseChips');
@@ -219,9 +222,27 @@ function renderExerciseList(items) {
   });
 }
 
+function exerciseDisplayName(item) {
+  if (typeof item === 'string') return item;
+  return item?.displayName || item?.label || item?.name || '';
+}
+
+function buildExerciseItem() {
+  const name = exerciseInput.value.trim();
+  const tool = exerciseToolSelect.value.trim();
+  const target = exerciseTargetSelect.value.trim();
+  const variant = exerciseVariantInput.value.trim();
+  if (!name) return null;
+
+  const details = [target, variant].filter(Boolean).join(', ');
+  const displayName = `${[tool, name].filter(Boolean).join(' ')}${details ? ` (${details})` : ''}`.trim();
+  return { tool, name, target, variant, displayName };
+}
+
 function renderChips() {
   exerciseChips.innerHTML = '';
-  state.exercises.forEach((name, idx) => {
+  state.exercises.forEach((item, idx) => {
+    const name = exerciseDisplayName(item);
     const li = document.createElement('li');
     const label = document.createElement('span');
     label.className = 'chip-label';
@@ -235,7 +256,7 @@ function renderChips() {
       if (!next) return;
       const trimmed = next.trim();
       if (!trimmed) return;
-      state.exercises[idx] = trimmed;
+      state.exercises[idx] = { name: trimmed, displayName: trimmed };
       renderChips();
       movementSearchInput.value = trimmed;
       movementNameInput.value = trimmed;
@@ -413,12 +434,16 @@ function filterExerciseSuggestions(q = '') {
 }
 
 function addExercise() {
-  const text = exerciseInput.value.trim();
-  if (!text) return;
-  if (!state.exercises.includes(text)) state.exercises.push(text);
-  movementSearchInput.value = text;
-  if (!movementNameInput.value.trim()) movementNameInput.value = text;
+  const item = buildExerciseItem();
+  if (!item) return;
+  const displayName = exerciseDisplayName(item);
+  if (!state.exercises.some(existing => exerciseDisplayName(existing) === displayName)) {
+    state.exercises.push(item);
+  }
+  movementSearchInput.value = item.name;
+  if (!movementNameInput.value.trim()) movementNameInput.value = item.name;
   exerciseInput.value = '';
+  exerciseVariantInput.value = '';
   renderChips();
 }
 
