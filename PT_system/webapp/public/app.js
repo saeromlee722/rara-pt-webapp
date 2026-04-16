@@ -2,8 +2,12 @@ const state = {
   members: [],
   exercises: [],
   notes: [],
-  learnedPatterns: {},
+  exerciseCatalog: [],
+  movements: [],
+  learnedMovements: [],
 };
+
+let exerciseSuggestTimer = null;
 
 const dateInput = document.getElementById('dateInput');
 const memberSelect = document.getElementById('memberSelect');
@@ -32,6 +36,23 @@ const learnExerciseInput = document.getElementById('learnExerciseInput');
 const learnPatternSelect = document.getElementById('learnPatternSelect');
 const learnSaveBtn = document.getElementById('learnSaveBtn');
 const learnStatus = document.getElementById('learnStatus');
+const movementSearchInput = document.getElementById('movementSearchInput');
+const movementLoadBtn = document.getElementById('movementLoadBtn');
+const movementSelect = document.getElementById('movementSelect');
+const movementNameInput = document.getElementById('movementNameInput');
+const movementAliasesInput = document.getElementById('movementAliasesInput');
+const movementPatternSelect = document.getElementById('movementPatternSelect');
+const movementRoleInput = document.getElementById('movementRoleInput');
+const movementPurposeInput = document.getElementById('movementPurposeInput');
+const movementCoachingInput = document.getElementById('movementCoachingInput');
+const movementSensationInput = document.getElementById('movementSensationInput');
+const movementErrorsInput = document.getElementById('movementErrorsInput');
+const movementNextInput = document.getElementById('movementNextInput');
+const movementSaveBtn = document.getElementById('movementSaveBtn');
+const movementMergeBtn = document.getElementById('movementMergeBtn');
+const movementStatus = document.getElementById('movementStatus');
+
+const MEMBER_NAME_PATTERN = /^[^\d()]+ \(\d{4}\)$/;
 
 function setToday() {
   const now = new Date();
@@ -96,21 +117,6 @@ function formatInline(text) {
   return out;
 }
 
-function normalizeMovementKey(text) {
-  return String(text || '').toLowerCase().replace(/\s+/g, '').trim();
-}
-function syncLearnPanel(exerciseName) {
-  const key = normalizeMovementKey(exerciseName);
-  const learned = state.learnedPatterns[key];
-  if (learned) {
-    learnPatternSelect.value = learned;
-    setLearnStatus(`\uD559\uC2B5\uB428: ${exerciseName.trim()} -> ${patternLabels[learned] || learned}`);
-    return;
-  }
-  if (learnStatus.textContent.startsWith('\uD559\uC2B5\uB428:')) {
-    setLearnStatus('');
-  }
-}
 function renderMarkdown(markdown) {
   const lines = String(markdown || '').split(/\r?\n/);
   const html = [];
@@ -220,29 +226,30 @@ function renderChips() {
     const label = document.createElement('span');
     label.className = 'chip-label';
     label.textContent = name;
-    const editBtn = document.createElement('button');
-    editBtn.className = 'chip-edit';
-    editBtn.type = 'button';
-    editBtn.textContent = '\uC218\uC815';
-    editBtn.addEventListener('click', () => {
-      const next = window.prompt('\uC6B4\uB3D9 \uC774\uB984 \uC218\uC815', name);
+    const edit = document.createElement('button');
+    edit.className = 'chip-edit';
+    edit.type = 'button';
+    edit.textContent = '수정';
+    edit.addEventListener('click', () => {
+      const next = window.prompt('운동 이름 수정', name);
       if (!next) return;
       const trimmed = next.trim();
       if (!trimmed) return;
       state.exercises[idx] = trimmed;
       renderChips();
-      syncLearnPanel(trimmed);
+      movementSearchInput.value = trimmed;
+      movementNameInput.value = trimmed;
     });
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.textContent = 'x';
-    delBtn.addEventListener('click', () => {
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = 'x';
+    del.addEventListener('click', () => {
       state.exercises.splice(idx, 1);
       renderChips();
     });
     li.appendChild(label);
-    li.appendChild(editBtn);
-    li.appendChild(delBtn);
+    li.appendChild(edit);
+    li.appendChild(del);
     exerciseChips.appendChild(li);
   });
 }
@@ -338,6 +345,11 @@ async function deleteNote(fileName) {
       body: JSON.stringify({ member: memberSelect.value, fileName }),
     });
     const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
+    if (syncFailed(data.sync)) {
+      setStatus(syncFailureMessage('삭제', data.sync), true);
+      await loadNotes();
+      return;
+    }
     setStatus(`삭제 완료: ${data.deletedPath}${syncMsg}`);
     if (state.editingFileName === fileName) closeEditPanel();
     await loadNotes();
@@ -366,6 +378,11 @@ async function saveEditedNote() {
     const correctionMsg = Array.isArray(data.corrections) && data.corrections.length
       ? ` | 교정:${data.corrections.join(', ')}`
       : '';
+    if (syncFailed(data.sync)) {
+      setStatus(syncFailureMessage('수정 저장', data.sync), true);
+      await loadNotes();
+      return;
+    }
     setStatus(`수정 저장 완료: ${data.savedPath}${syncMsg}${correctionMsg}`);
     await loadNotes();
     closeEditPanel();
@@ -380,14 +397,27 @@ async function loadMembers() {
 }
 
 async function loadExerciseSuggestions(q = '') {
-  const data = await api(`/api/exercises?q=${encodeURIComponent(q)}`);
-  renderExerciseList(data.items);
+  if (!state.exerciseCatalog.length) {
+    const data = await api('/api/exercises?all=1');
+    state.exerciseCatalog = Array.isArray(data.items) ? data.items : [];
+  }
+  renderExerciseList(filterExerciseSuggestions(q));
+}
+
+function filterExerciseSuggestions(q = '') {
+  const query = String(q || '').trim();
+  const all = state.exerciseCatalog;
+  if (!query) return all.slice(0, 20);
+  const limit = query.length >= 2 ? 20 : 15;
+  return all.filter(item => item.includes(query)).slice(0, limit);
 }
 
 function addExercise() {
   const text = exerciseInput.value.trim();
   if (!text) return;
   if (!state.exercises.includes(text)) state.exercises.push(text);
+  movementSearchInput.value = text;
+  if (!movementNameInput.value.trim()) movementNameInput.value = text;
   exerciseInput.value = '';
   renderChips();
 }
@@ -416,23 +446,159 @@ function setStatus(text, isError = false) {
   statusText.style.color = isError ? '#b91c1c' : '#56635c';
 }
 
+function syncFailed(sync) {
+  return !!(sync && sync.enabled !== false && sync.synced === false);
+}
+
+function syncFailureMessage(action, sync) {
+  const reason = sync && sync.reason ? ` 사유: ${sync.reason}` : '';
+  return `GitHub 미반영: ${action}은 Render 임시 저장소에만 반영됐을 수 있어. 새로고침/재배포 전에 내용을 보존해줘.${reason}`;
+}
+
 function setLearnStatus(text, isError = false) {
   learnStatus.textContent = text;
   learnStatus.style.color = isError ? '#b91c1c' : '#56635c';
 }
 
+function setMovementStatus(text, isError = false) {
+  movementStatus.textContent = text;
+  movementStatus.style.color = isError ? '#b91c1c' : '#56635c';
+}
+
+function listToText(value) {
+  return Array.isArray(value) ? value.join(', ') : '';
+}
+
+function fillMovementForm(item) {
+  if (!item) {
+    const seed = movementSearchInput.value.trim();
+    movementNameInput.value = seed;
+    movementAliasesInput.value = '';
+    movementRoleInput.value = '';
+    movementPurposeInput.value = '';
+    movementCoachingInput.value = '';
+    movementSensationInput.value = '';
+    movementErrorsInput.value = '';
+    movementNextInput.value = '';
+    if (movementPatternSelect.options.length) movementPatternSelect.value = 'general';
+    return;
+  }
+
+  movementNameInput.value = item.name || '';
+  movementAliasesInput.value = listToText(item.aliases);
+  movementPatternSelect.value = item.movementPattern || 'general';
+  movementRoleInput.value = item.exerciseRole || '';
+  movementPurposeInput.value = listToText(item.exercisePurpose);
+  movementCoachingInput.value = listToText(item.coachingPoints);
+  movementSensationInput.value = listToText(item.sensationKeywords);
+  movementErrorsInput.value = listToText(item.commonErrors);
+  movementNextInput.value = listToText(item.nextExerciseLinks);
+}
+
+function renderMovementSelect() {
+  movementSelect.innerHTML = '';
+
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = state.movements.length ? '동작 선택 또는 새로 입력' : '등록된 DB 동작 없음';
+  movementSelect.appendChild(blank);
+
+  state.movements.forEach((item, idx) => {
+    const opt = document.createElement('option');
+    opt.value = String(idx);
+    const aliases = Array.isArray(item.aliases) && item.aliases.length ? ` / ${item.aliases.join(', ')}` : '';
+    opt.textContent = `${item.name}${aliases}`;
+    movementSelect.appendChild(opt);
+  });
+}
+
+async function loadMovements() {
+  const q = movementSearchInput.value.trim();
+  const data = await api(`/api/movements/manage?q=${encodeURIComponent(q)}`);
+  state.movements = Array.isArray(data.items) ? data.items : [];
+  state.learnedMovements = Array.isArray(data.learnedItems) ? data.learnedItems : [];
+  renderMovementSelect();
+
+  const exact = state.movements.find(item => {
+    const names = [item.name, ...(Array.isArray(item.aliases) ? item.aliases : [])];
+    return q && names.some(name => name === q);
+  });
+  fillMovementForm(exact || null);
+
+  const learnedMsg = state.learnedMovements.length ? `, 학습 ${state.learnedMovements.length}개` : '';
+  setMovementStatus(`DB 동작 ${state.movements.length}개${learnedMsg} 불러옴`);
+}
+
+function movementPayload() {
+  return {
+    name: movementNameInput.value.trim(),
+    aliases: movementAliasesInput.value,
+    movementPattern: movementPatternSelect.value,
+    exerciseRole: movementRoleInput.value,
+    exercisePurpose: movementPurposeInput.value,
+    coachingPoints: movementCoachingInput.value,
+    sensationKeywords: movementSensationInput.value,
+    commonErrors: movementErrorsInput.value,
+    nextExerciseLinks: movementNextInput.value,
+  };
+}
+
+async function saveMovement() {
+  const body = movementPayload();
+  if (!body.name) {
+    setMovementStatus('기준 운동명을 입력해줘.', true);
+    movementNameInput.focus();
+    return;
+  }
+
+  const data = await api('/api/movements/manage', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  state.exerciseCatalog = [];
+  setMovementStatus(`저장 완료: ${data.item.name}`);
+  await loadMovements();
+  await loadExerciseSuggestions(exerciseInput.value);
+}
+
+async function mergeMovement() {
+  const source = movementSearchInput.value.trim();
+  const target = movementNameInput.value.trim();
+  if (!source || !target) {
+    setMovementStatus('합칠 표기와 기준 운동명을 모두 입력해줘.', true);
+    return;
+  }
+
+  const data = await api('/api/movements/merge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source, target }),
+  });
+  state.exerciseCatalog = [];
+  setMovementStatus(`합치기 완료: ${source} -> ${data.item.name}`);
+  await loadMovements();
+  await loadExerciseSuggestions(exerciseInput.value);
+}
+
+function isValidMemberDisplayName(name) {
+  return MEMBER_NAME_PATTERN.test(String(name || '').trim());
+}
+
 async function loadPatternKeys() {
   const data = await api('/api/patterns');
-  state.learnedPatterns = {};
-  (data.items || []).forEach(item => {
-    state.learnedPatterns[item.key] = item.pattern;
-  });
   learnPatternSelect.innerHTML = '';
+  movementPatternSelect.innerHTML = '';
   (data.patternKeys || []).forEach(key => {
     const opt = document.createElement('option');
     opt.value = key;
     opt.textContent = patternLabels[key] || key;
     learnPatternSelect.appendChild(opt);
+
+    const movementOpt = document.createElement('option');
+    movementOpt.value = key;
+    movementOpt.textContent = patternLabels[key] || key;
+    movementPatternSelect.appendChild(movementOpt);
   });
 }
 
@@ -456,6 +622,11 @@ addMemberBtn.addEventListener('click', async () => {
   try {
     const member = newMemberInput.value.trim();
     if (!member) return;
+    if (!isValidMemberDisplayName(member)) {
+      setStatus('회원 형식은 이름 (1234) 로 입력해줘.', true);
+      newMemberInput.focus();
+      return;
+    }
     const data = await api('/api/members', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -480,17 +651,39 @@ exerciseInput.addEventListener('keydown', e => {
   }
 });
 exerciseInput.addEventListener('input', () => {
-  loadExerciseSuggestions(exerciseInput.value).catch(() => {});
+  clearTimeout(exerciseSuggestTimer);
+  exerciseSuggestTimer = setTimeout(() => {
+    loadExerciseSuggestions(exerciseInput.value).catch(() => {});
+  }, 220);
   if (!learnExerciseInput.value.trim()) learnExerciseInput.value = exerciseInput.value;
-  syncLearnPanel(exerciseInput.value);
-});
-
-learnExerciseInput.addEventListener('input', () => {
-  syncLearnPanel(learnExerciseInput.value);
 });
 
 learnSaveBtn.addEventListener('click', () => {
   saveLearnPattern().catch(e => setLearnStatus(e.message, true));
+});
+
+movementLoadBtn.addEventListener('click', () => {
+  loadMovements().catch(e => setMovementStatus(e.message, true));
+});
+
+movementSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    loadMovements().catch(err => setMovementStatus(err.message, true));
+  }
+});
+
+movementSelect.addEventListener('change', () => {
+  const item = state.movements[Number(movementSelect.value)];
+  fillMovementForm(item || null);
+});
+
+movementSaveBtn.addEventListener('click', () => {
+  saveMovement().catch(e => setMovementStatus(e.message, true));
+});
+
+movementMergeBtn.addEventListener('click', () => {
+  mergeMovement().catch(e => setMovementStatus(e.message, true));
 });
 
 memberSelect.addEventListener('change', () => {
@@ -545,6 +738,11 @@ saveBtn.addEventListener('click', async () => {
     const syncMsg = data.sync && data.sync.synced ? ` | sync:${data.sync.reason}` : (data.sync ? ` | sync_fail:${data.sync.reason}` : '');
     const engine = data.engine === 'gpt' ? 'GPT' : 'RULE';
     const gptMsg = data.gptError ? ` | gpt:${data.gptError}` : '';
+    if (syncFailed(data.sync)) {
+      setStatus(syncFailureMessage('저장', data.sync), true);
+      if (typeof loadNotes === 'function') await loadNotes();
+      return;
+    }
     setStatus(`완료[${engine}]: ${data.savedPath}${syncMsg}${gptMsg}`);
     if (typeof loadNotes === 'function') await loadNotes();
     closeEditPanel();
@@ -560,6 +758,7 @@ saveBtn.addEventListener('click', async () => {
   await loadMembers();
   await loadExerciseSuggestions('');
   await loadPatternKeys();
+  await loadMovements();
   await loadNotes();
   if (state.members.length === 0) {
     setStatus('먼저 회원을 추가해줘.');

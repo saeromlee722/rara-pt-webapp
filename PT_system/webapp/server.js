@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -43,6 +43,9 @@ const PATTERN_KEYS = [
   'general',
   'fly'
 ];
+
+const MEMBER_NAME_PATTERN = /^[^\d()]+ \(\d{4}\)$/;
+let exerciseCatalogCache = null;
 
 function getLanUrls(port) {
   const urls = [];
@@ -94,6 +97,10 @@ function normalizeMemberName(member) {
   if (/\(\d{4}\)\s*$/.test(clean)) return clean;
   if (clean.includes('님')) return clean;
   return clean;
+}
+
+function isValidMemberDisplayName(member) {
+  return MEMBER_NAME_PATTERN.test(String(member || '').trim());
 }
 
 function plainMember(member) {
@@ -175,6 +182,200 @@ function readMovementDb() {
   } catch {
     return { exercises: [] };
   }
+}
+
+function writeMovementDb(db) {
+  if (!fs.existsSync(LEARN_DIR)) fs.mkdirSync(LEARN_DIR, { recursive: true });
+  const exercises = Array.isArray(db?.exercises) ? db.exercises : [];
+  fs.writeFileSync(
+    MOVEMENT_DB_PATH,
+    JSON.stringify({ version: 1, exercises }, null, 2),
+    'utf8'
+  );
+  invalidateExerciseCatalog();
+}
+
+function splitList(value) {
+  if (Array.isArray(value)) {
+    return value.map(x => String(x || '').trim()).filter(Boolean);
+  }
+  return String(value || '')
+    .split(/\r?\n|,/)
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+function movementToManageItem(ex) {
+  const aliases = Array.isArray(ex.aliases) ? ex.aliases : [];
+  return {
+    name: String(ex.name || '').trim(),
+    aliases,
+    movementPattern: ex.movementPattern || 'general',
+    exerciseRole: ex.exerciseRole || '',
+    primaryTargetMuscles: Array.isArray(ex.primaryTargetMuscles) ? ex.primaryTargetMuscles : [],
+    secondaryMuscles: Array.isArray(ex.secondaryMuscles) ? ex.secondaryMuscles : [],
+    exercisePurpose: Array.isArray(ex.exercisePurpose) ? ex.exercisePurpose : [],
+    coachingPoints: Array.isArray(ex.coachingPoints) ? ex.coachingPoints : [],
+    sensationKeywords: Array.isArray(ex.sensationKeywords) ? ex.sensationKeywords : [],
+    commonErrors: Array.isArray(ex.commonErrors) ? ex.commonErrors : [],
+    correctionEffects: Array.isArray(ex.correctionEffects) ? ex.correctionEffects : [],
+    routinePosition: ex.routinePosition || '',
+    nextExerciseLinks: Array.isArray(ex.nextExerciseLinks) ? ex.nextExerciseLinks : [],
+  };
+}
+
+function getMovementManageList(q = '') {
+  const query = normalizeMovementKey(q);
+  const db = readMovementDb();
+  const learned = readLearnDb().overrides || {};
+  const items = (db.exercises || [])
+    .map(movementToManageItem)
+    .filter(item => {
+      if (!query) return true;
+      const names = [item.name, ...item.aliases].map(normalizeMovementKey);
+      return names.some(name => name.includes(query));
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+  const learnedItems = Object.entries(learned)
+    .map(([key, pattern]) => ({ key, pattern }))
+    .filter(item => !query || item.key.includes(query))
+    .sort((a, b) => a.key.localeCompare(b.key, 'ko'));
+
+  return { items, learnedItems, patternKeys: PATTERN_KEYS };
+}
+
+function saveMovementMeta(payload) {
+  const cleanName = String(payload.name || '').trim();
+  if (!cleanName) throw new Error('운동명을 입력하세요.');
+
+  const cleanPattern = String(payload.movementPattern || 'general').trim();
+  if (!PATTERN_KEYS.includes(cleanPattern)) throw new Error('유효하지 않은 패턴입니다.');
+
+  const db = readMovementDb();
+  const exercises = Array.isArray(db.exercises) ? db.exercises : [];
+  const key = normalizeMovementKey(cleanName);
+  const existingIndex = exercises.findIndex(ex => {
+    const names = [ex.name, ...(Array.isArray(ex.aliases) ? ex.aliases : [])];
+    return names.some(name => normalizeMovementKey(name) === key);
+  });
+
+  const aliases = splitList(payload.aliases)
+    .filter(alias => normalizeMovementKey(alias) && normalizeMovementKey(alias) !== key);
+  const previous = existingIndex >= 0 ? exercises[existingIndex] : {};
+  const mergedAliases = Array.from(new Set([
+    ...(Array.isArray(previous.aliases) ? previous.aliases : []),
+    ...aliases,
+  ])).filter(alias => normalizeMovementKey(alias) !== key);
+
+  const next = {
+    ...previous,
+    name: cleanName,
+    aliases: mergedAliases,
+    exerciseRole: String(payload.exerciseRole || previous.exerciseRole || '').trim(),
+    movementPattern: cleanPattern,
+    primaryTargetMuscles: splitList(payload.primaryTargetMuscles),
+    secondaryMuscles: splitList(payload.secondaryMuscles),
+    exercisePurpose: splitList(payload.exercisePurpose),
+    coachingPoints: splitList(payload.coachingPoints),
+    sensationKeywords: splitList(payload.sensationKeywords),
+    commonErrors: splitList(payload.commonErrors),
+    correctionEffects: splitList(payload.correctionEffects),
+    routinePosition: String(payload.routinePosition || previous.routinePosition || '').trim(),
+    nextExerciseLinks: splitList(payload.nextExerciseLinks),
+  };
+
+  if (existingIndex >= 0) exercises[existingIndex] = next;
+  else exercises.push(next);
+
+  writeMovementDb({ exercises });
+
+  const learnDb = readLearnDb();
+  learnDb.overrides[normalizeMovementKey(cleanName)] = cleanPattern;
+  for (const alias of mergedAliases) {
+    learnDb.overrides[normalizeMovementKey(alias)] = cleanPattern;
+  }
+  writeLearnDb(learnDb);
+
+  return movementToManageItem(next);
+}
+
+function mergeMovementAlias(payload) {
+  const source = String(payload.source || '').trim();
+  const target = String(payload.target || '').trim();
+  if (!source || !target) throw new Error('합칠 표기와 기준 운동명을 모두 입력하세요.');
+
+  const targetKey = normalizeMovementKey(target);
+  const sourceKey = normalizeMovementKey(source);
+  if (!targetKey || !sourceKey) throw new Error('운동명이 올바르지 않습니다.');
+  if (targetKey === sourceKey) throw new Error('같은 이름끼리는 합칠 수 없습니다.');
+
+  const db = readMovementDb();
+  const exercises = Array.isArray(db.exercises) ? db.exercises : [];
+  let targetIndex = exercises.findIndex(ex => {
+    const names = [ex.name, ...(Array.isArray(ex.aliases) ? ex.aliases : [])];
+    return names.some(name => normalizeMovementKey(name) === targetKey);
+  });
+
+  const sourceIndex = exercises.findIndex(ex => {
+    const names = [ex.name, ...(Array.isArray(ex.aliases) ? ex.aliases : [])];
+    return names.some(name => normalizeMovementKey(name) === sourceKey);
+  });
+
+  if (targetIndex < 0) {
+    exercises.push({
+      name: target,
+      aliases: [],
+      movementPattern: getPattern(target),
+      exercisePurpose: [],
+      coachingPoints: [],
+      sensationKeywords: [],
+      commonErrors: [],
+      nextExerciseLinks: [],
+    });
+    targetIndex = exercises.length - 1;
+  }
+
+  const targetMeta = exercises[targetIndex];
+  const aliases = new Set(Array.isArray(targetMeta.aliases) ? targetMeta.aliases : []);
+  aliases.add(source);
+
+  if (sourceIndex >= 0 && sourceIndex !== targetIndex) {
+    const sourceMeta = exercises[sourceIndex];
+    aliases.add(sourceMeta.name);
+    for (const alias of Array.isArray(sourceMeta.aliases) ? sourceMeta.aliases : []) aliases.add(alias);
+    const listFields = [
+      'primaryTargetMuscles',
+      'secondaryMuscles',
+      'exercisePurpose',
+      'coachingPoints',
+      'sensationKeywords',
+      'commonErrors',
+      'correctionEffects',
+      'nextExerciseLinks',
+    ];
+    for (const field of listFields) {
+      targetMeta[field] = Array.from(new Set([
+        ...(Array.isArray(targetMeta[field]) ? targetMeta[field] : []),
+        ...(Array.isArray(sourceMeta[field]) ? sourceMeta[field] : []),
+      ]));
+    }
+    exercises.splice(sourceIndex, 1);
+  }
+
+  targetMeta.aliases = Array.from(aliases)
+    .map(alias => String(alias || '').trim())
+    .filter(alias => alias && normalizeMovementKey(alias) !== normalizeMovementKey(targetMeta.name));
+
+  writeMovementDb({ exercises });
+
+  const pattern = targetMeta.movementPattern || getPattern(targetMeta.name);
+  const learnDb = readLearnDb();
+  learnDb.overrides[sourceKey] = pattern;
+  learnDb.overrides[targetKey] = pattern;
+  writeLearnDb(learnDb);
+
+  return movementToManageItem(targetMeta);
 }
 
 function findMovementMeta(exerciseName) {
@@ -452,6 +653,15 @@ function extractExercisesFromFile(filePath, set) {
 }
 
 function getExerciseSuggestions(query) {
+  const all = getExerciseCatalog();
+  const q = String(query || '').trim();
+  if (!q) return all.slice(0, 100);
+  return all.filter(x => x.includes(q)).slice(0, 30);
+}
+
+function getExerciseCatalog() {
+  if (exerciseCatalogCache) return exerciseCatalogCache;
+
   const set = new Set();
   for (const memberDir of getMembers()) {
     const absMember = path.join(PT_DATA_DIR, memberDir);
@@ -462,10 +672,19 @@ function getExerciseSuggestions(query) {
     }
   }
 
-  const all = Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
-  const q = String(query || '').trim();
-  if (!q) return all.slice(0, 100);
-  return all.filter(x => x.includes(q)).slice(0, 30);
+  for (const ex of readMovementDb().exercises || []) {
+    if (ex.name) set.add(String(ex.name).trim());
+    for (const alias of Array.isArray(ex.aliases) ? ex.aliases : []) {
+      if (alias) set.add(String(alias).trim());
+    }
+  }
+
+  exerciseCatalogCache = Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
+  return exerciseCatalogCache;
+}
+
+function invalidateExerciseCatalog() {
+  exerciseCatalogCache = null;
 }
 
 function parseDate(raw) {
@@ -635,7 +854,7 @@ function buildNote(payload) {
     const base = PROFILES[pattern] || PROFILES.general;
     const meta = findMovementMeta(name);
 
-    if (!meta) return { name, pattern, data: base };
+    if (!meta) return { name, pattern, hasMeta: false, data: base };
 
     const metaPurpose = Array.isArray(meta.exercisePurpose) && meta.exercisePurpose.length > 0
       ? meta.exercisePurpose.join(' + ')
@@ -665,6 +884,7 @@ function buildNote(payload) {
       pattern,
       data: {
         theme: base.theme,
+        role: meta.exerciseRole || '',
         tag: metaTag,
         purpose: metaPurpose,
         points: metaPoints,
@@ -674,6 +894,7 @@ function buildNote(payload) {
         signals: metaSignals,
         next: metaNext,
       },
+      hasMeta: true,
     };
   });
 
@@ -711,11 +932,15 @@ function buildNote(payload) {
 
     lines.push(`### ${idx + 1}️⃣ ${p.name}`, '');
     lines.push(`_(${p.data.tag})_`, '');
+    if (p.data.role) lines.push(`- **역할**  `, `    ${p.data.role}`, '    ');
     lines.push('- **목적**  ', `    ${p.data.purpose}`, '    ');
     lines.push('- **포인트**', '    ');
     points.forEach(pt => lines.push(`    - ${pt}`, '        '));
     lines.push('- **🔑 체감 키워드**', '    ');
     keywords.forEach(kw => lines.push(`    - ${kw}`, '        '));
+    lines.push('- **흔한 오류**', '    ');
+    uniq([...p.data.signals, ...adj.extraSignals]).slice(0, 3).forEach(signal => lines.push(`    - ${signal}`, '        '));
+    lines.push('- **다음 연결**  ', `    ${p.data.next}`, '    ');
     lines.push('', '---', '');
   });
 
@@ -915,6 +1140,7 @@ async function saveNote(payload) {
   if (!fs.existsSync(absDir)) fs.mkdirSync(absDir, { recursive: true });
   const target = uniquePath(absDir, built.fileName);
   fs.writeFileSync(target, generated.markdown, 'utf8');
+  invalidateExerciseCatalog();
 
   const finalName = path.basename(target);
   const sync = maybeSyncToGitHub(folder, finalName, generated.markdown);
@@ -945,6 +1171,7 @@ function deleteNote(payload) {
   if (!fs.existsSync(target)) throw new Error('파일이 존재하지 않습니다.');
 
   fs.rmSync(target, { force: true });
+  invalidateExerciseCatalog();
   const sync = maybeDeleteFromGitHub(folder, fileName);
 
   return { deletedPath: target, sync };
@@ -968,6 +1195,7 @@ function updateNote(payload) {
 
   const checked = spellCheckMarkdown(String(payload.content || ''));
   fs.writeFileSync(target, checked.text, 'utf8');
+  invalidateExerciseCatalog();
   const sync = maybeSyncToGitHub(folder, fileName, checked.text);
 
   return {
@@ -1032,6 +1260,9 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const normalized = normalizeMemberName(body.member);
       if (!normalized) return sendJson(res, 400, { error: '회원 이름을 입력하세요.' });
+      if (!isValidMemberDisplayName(normalized)) {
+        return sendJson(res, 400, { error: '회원 형식은 이름 (1234) 이어야 합니다.' });
+      }
 
       ensurePtData();
       const memberDir = path.join(PT_DATA_DIR, normalized);
@@ -1042,7 +1273,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url.startsWith('/api/exercises')) {
       const u = new URL(req.url, 'http://localhost');
-      sendJson(res, 200, { items: getExerciseSuggestions(u.searchParams.get('q') || '') });
+      const returnAll = u.searchParams.get('all') === '1';
+      sendJson(res, 200, {
+        items: returnAll ? getExerciseCatalog() : getExerciseSuggestions(u.searchParams.get('q') || '')
+      });
       return;
     }
 
@@ -1053,16 +1287,36 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/patterns/learn') {
+      const body = await readBody(req);
+      const result = learnMovementPattern(body.exercise, body.pattern);
+      sendJson(res, 200, { ok: true, ...result });
+      return;
+    }
+
     if (req.method === 'GET' && req.url === '/api/movement-db') {
       const db = readMovementDb();
       sendJson(res, 200, { count: (db.exercises || []).length, exercises: db.exercises || [] });
       return;
     }
 
-    if (req.method === 'POST' && req.url === '/api/patterns/learn') {
+    if (req.method === 'GET' && req.url.startsWith('/api/movements/manage')) {
+      const u = new URL(req.url, 'http://localhost');
+      sendJson(res, 200, getMovementManageList(u.searchParams.get('q') || ''));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/movements/manage') {
       const body = await readBody(req);
-      const result = learnMovementPattern(body.exercise, body.pattern);
-      sendJson(res, 200, { ok: true, ...result });
+      const item = saveMovementMeta(body);
+      sendJson(res, 200, { ok: true, item });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/movements/merge') {
+      const body = await readBody(req);
+      const item = mergeMovementAlias(body);
+      sendJson(res, 200, { ok: true, item });
       return;
     }
 
@@ -1137,6 +1391,9 @@ server.listen(PORT, HOST, () => {
     console.log('- Mobile URL not found. Check network connection.');
   }
 });
+
+
+
 
 
 
