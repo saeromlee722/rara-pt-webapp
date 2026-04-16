@@ -427,18 +427,20 @@ function sanitizeExercises(list) {
 function getMovementContext(exercises) {
   return normalizeExerciseItems(exercises).map(item => {
     const meta = findMovementMeta(item);
+    const inferred = targetProfileAdjust(item);
     return {
       name: item.displayName || item.name,
       baseName: item.name,
       tool: item.tool,
       target: item.target,
       variant: item.variant,
+      isLearned: !!meta,
       movementPattern: meta?.movementPattern || getPattern(item.displayName || item.name),
-      purpose: Array.isArray(meta?.exercisePurpose) ? meta.exercisePurpose : [],
-      coachingPoints: Array.isArray(meta?.coachingPoints) ? meta.coachingPoints : [],
-      sensationKeywords: Array.isArray(meta?.sensationKeywords) ? meta.sensationKeywords : [],
-      commonErrors: Array.isArray(meta?.commonErrors) ? meta.commonErrors : [],
-      nextExerciseLinks: Array.isArray(meta?.nextExerciseLinks) ? meta.nextExerciseLinks : [],
+      purpose: Array.isArray(meta?.exercisePurpose) && meta.exercisePurpose.length ? meta.exercisePurpose : (inferred.purpose || []),
+      coachingPoints: Array.isArray(meta?.coachingPoints) && meta.coachingPoints.length ? meta.coachingPoints : (inferred.points || []),
+      sensationKeywords: Array.isArray(meta?.sensationKeywords) && meta.sensationKeywords.length ? meta.sensationKeywords : (inferred.keywords || []),
+      commonErrors: Array.isArray(meta?.commonErrors) && meta.commonErrors.length ? meta.commonErrors : (inferred.signals || []),
+      nextExerciseLinks: Array.isArray(meta?.nextExerciseLinks) && meta.nextExerciseLinks.length ? meta.nextExerciseLinks : (inferred.next ? [inferred.next] : []),
     };
   });
 }
@@ -563,6 +565,11 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   '- 로우/풀다운 계열: 팔 개입 최소, 견갑 순서, 등 체감 중심',
   '- 불필요한 영어 혼용 최소화 (운동명 제외)',
   '- 각 블록 충분히 구체적으로 작성 (얕은 내용 금지)',
+  '- 새 동작이라도 절대 일반론으로 채우지 말고 exerciseItems의 tool/target/variant와 movementContext를 근거로 구체화한다',
+  '- movementContext.isLearned가 false인 동작은 새 동작으로 보고, 장비 특성 + 타겟 근육 + 움직임 패턴을 조합해 역할/목적/오류를 직접 추론한다',
+  '- 같은 동작명이라도 target이 중둔근이면 골반 수평/외전 안정, 대둔근이면 고관절 신전/둔근 잠김으로 완전히 다르게 쓴다',
+  '- tool이 머신이면 궤도 고정/패드 세팅/반동 제어, 케이블이면 장력 방향/시작 각도, 덤벨/바벨이면 중량 중심과 그립 안정성을 반영한다',
+  '- 각 운동의 코칭 포인트는 최소 4개, 흔한 오류는 최소 3개를 운동별로 다르게 작성한다',
 ].join('\n');
   
   const userPayload = {

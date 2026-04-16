@@ -509,6 +509,30 @@ button.danger {
   border-top: 1px dashed #cfddd2;
 }
 
+.movement-admin summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid #d6e2da;
+  border-radius: 12px;
+  background: #f7faf8;
+  cursor: pointer;
+  color: #24342c;
+  font-weight: 800;
+}
+
+.movement-admin summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.movement-admin-body {
+  margin-top: 12px;
+}
+
 .movement-search-row,
 .movement-actions {
   display: grid;
