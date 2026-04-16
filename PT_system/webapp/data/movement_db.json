@@ -50,6 +50,24 @@
       "nextExerciseLinks": ["런지", "레그프레스", "힙힌지"]
     },
     {
+      "name": "힙 익스텐션",
+      "aliases": [
+        "힙익스텐션",
+        "hip extension"
+      ],
+      "exerciseRole": "glute isolation / hip extension",
+      "movementPattern": "hipext",
+      "primaryTargetMuscles": ["대둔근"],
+      "secondaryMuscles": ["햄스트링", "중둔근"],
+      "exercisePurpose": ["고관절 신전 감각 강화", "둔근 수축 선명화", "허리 보상 감소"],
+      "coachingPoints": ["골반이 열리지 않게 정면 고정", "허리로 차올리지 않고 엉덩이로 뒤로 보낸다", "끝지점에서 둔근 수축 1초 확인", "무릎 각도와 발끝 방향 유지"],
+      "sensationKeywords": ["엉덩이 뒤쪽 수축", "둔근이 잠기는 느낌", "허리 부담 없음"],
+      "commonErrors": ["허리 과신전", "골반 회전", "다리를 반동으로 차올림", "햄스트링만 과하게 쥐어짜짐"],
+      "correctionEffects": ["둔근 신전 패턴 개선", "힙힌지 보조", "런지/스쿼트 둔근 사용감 증가"],
+      "routinePosition": "activation / accessory",
+      "nextExerciseLinks": ["힙쓰러스트", "스티프 데드리프트", "런지"]
+    },
+    {
       "name": "스티프 데드리프트",
       "aliases": [
         "stiff deadlift",

@@ -569,6 +569,7 @@ async function generateNoteWithGpt(payload, fallbackMarkdown, extraInstruction =
   '- movementContext.isLearned가 false인 동작은 새 동작으로 보고, 장비 특성 + 타겟 근육 + 움직임 패턴을 조합해 역할/목적/오류를 직접 추론한다',
   '- 같은 동작명이라도 target이 중둔근이면 골반 수평/외전 안정, 대둔근이면 고관절 신전/둔근 잠김으로 완전히 다르게 쓴다',
   '- tool이 머신이면 궤도 고정/패드 세팅/반동 제어, 케이블이면 장력 방향/시작 각도, 덤벨/바벨이면 중량 중심과 그립 안정성을 반영한다',
+  '- 힙 익스텐션/hip extension은 고관절 신전과 둔근 운동이다. 트라이셉스 익스텐션처럼 해석하지 말고 손목/팔꿈치/삼두 오류를 넣지 않는다',
   '- 각 운동의 코칭 포인트는 최소 4개, 흔한 오류는 최소 3개를 운동별로 다르게 작성한다',
 ].join('\n');
   
@@ -798,6 +799,7 @@ function getPattern(ex) {
 
   if (/카프레이즈|calf/.test(ex)) return 'squat';
   if (/레그컬|leg\\s*curl|햄스트링.*컬/.test(ex)) return 'hipext';
+  if (/힙\s*익스텐션|hip\s*extension/.test(ex)) return 'hipext';
   if (/트라이셉|삼두|이두|컬|로프/.test(ex)) return 'arm';
   if (/힙.*킥백|글루트.*킥백/.test(ex)) return 'hipext';
   if (/몬스터.*글루트|글루트.*어브덕|힙.*어브덕|어브덕션/.test(ex)) return 'abduction';
