@@ -262,6 +262,57 @@ function formatExerciseDisplayName({ tool = '', name = '', target = '', variant 
   return `${label}${details ? ` (${details})` : ''}`.trim();
 }
 
+const EQUIPMENT_WORDS = ['맨몸', '덤벨', '바벨', '케틀벨', '케이블', '머신', '밴드', '스미스', '플레이트'];
+const NON_MACHINE_TOOLS = EQUIPMENT_WORDS.filter(tool => tool !== '머신');
+
+function splitExerciseDetails(label) {
+  const clean = String(label || '').trim();
+  const match = clean.match(/^(.+?)\s*\((.+)\)$/);
+  return {
+    base: match ? match[1].trim() : clean,
+    details: match ? match[2].trim() : '',
+  };
+}
+
+function normalizeSuggestionBaseName(base) {
+  return String(base || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/레그프레스/g, '레그 프레스')
+    .replace(/랫풀다운/g, '랫 풀다운')
+    .replace(/하이로우/g, '하이 로우')
+    .replace(/로우로우/g, '로우 로우')
+    .replace(/미드로우/g, '미드 로우')
+    .replace(/힙\s*쓰러스트/g, '힙쓰러스트')
+    .replace(/힙익스텐션/g, '힙 익스텐션')
+    .replace(/펙덱플라이/g, '펙덱 플라이')
+    .replace(/사이들 레터럴/g, '사이드 레터럴');
+}
+
+function hasExplicitNonMachineTool(label) {
+  const { base } = splitExerciseDetails(label);
+  return NON_MACHINE_TOOLS.some(tool => base.startsWith(`${tool} `));
+}
+
+function suggestionForSelectedTool(label, selectedTool) {
+  const cleanTool = String(selectedTool || '').trim();
+  const cleanLabel = String(label || '').trim();
+  if (!cleanTool) return cleanLabel;
+
+  const parsed = splitExerciseDetails(cleanLabel);
+  const base = normalizeSuggestionBaseName(parsed.base);
+  const details = parsed.details;
+  if (isMachineTool(cleanTool)) {
+    if (hasExplicitNonMachineTool(cleanLabel)) return '';
+    const machineName = formatExerciseDisplayName({ tool: cleanTool, name: base });
+    return details ? `${machineName} (${details})` : machineName;
+  }
+
+  if (base.includes('머신')) return '';
+  const toolName = formatExerciseDisplayName({ tool: cleanTool, name: base });
+  return details ? `${toolName} (${details})` : toolName;
+}
+
 function buildExerciseItem() {
   const rawName = exerciseInput.value.trim();
   const tool = exerciseToolSelect.value.trim();
@@ -462,7 +513,17 @@ async function loadExerciseSuggestions(q = '') {
 
 function filterExerciseSuggestions(q = '') {
   const query = String(q || '').trim();
-  const all = state.exerciseCatalog;
+  const selectedTool = exerciseToolSelect.value.trim();
+  const seen = new Set();
+  const all = state.exerciseCatalog
+    .map(item => suggestionForSelectedTool(item, selectedTool))
+    .filter(Boolean)
+    .filter(item => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+
   if (!query) return all.slice(0, 20);
   const limit = query.length >= 2 ? 20 : 15;
   return all.filter(item => item.includes(query)).slice(0, limit);
@@ -716,6 +777,10 @@ exerciseInput.addEventListener('input', () => {
     loadExerciseSuggestions(exerciseInput.value).catch(() => {});
   }, 220);
   if (!learnExerciseInput.value.trim()) learnExerciseInput.value = exerciseInput.value;
+});
+
+exerciseToolSelect.addEventListener('change', () => {
+  loadExerciseSuggestions(exerciseInput.value).catch(() => {});
 });
 
 learnSaveBtn.addEventListener('click', () => {
