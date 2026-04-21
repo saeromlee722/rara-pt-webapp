@@ -290,6 +290,45 @@ function normalizeSuggestionBaseName(base) {
     .replace(/굿모닝\s*엑사사이즈/g, '굿모닝');
 }
 
+const TARGET_SUGGESTION_HINTS = {
+  중둔근: ['아웃타이', '어브덕', '어브덕션', '몬스터 글루트', '글루트 어브덕', '힙 어브덕', '크램쉘', '사이드 스텝', '밴드 워크'],
+  대둔근: ['힙쓰러스트', '힙 익스텐션', '킥백', '글루트', '브릿지', '굿모닝', '스쿼트', '레그 프레스', '브이스쿼트', '런지', '스플릿', '스텝업', '펜듈럼'],
+  '햄스트링+둔근': ['힙쓰러스트', '힙 익스텐션', '스티프', '데드리프트', '굿모닝', '레그 컬', '레그컬', '킥백', '브릿지', '레그 프레스', '브이스쿼트'],
+  햄스트링: ['스티프', '데드리프트', '굿모닝', '레그 컬', '레그컬', '힙 익스텐션', '백 익스텐션', '레그 프레스', '브이스쿼트'],
+  대퇴사두: ['레그 프레스', '레그 익스텐션', '스쿼트', '브이스쿼트', '핵스쿼트', '펜듈럼', '런지', '스플릿', '스텝업'],
+  '하체 전체': ['레그 프레스', '스쿼트', '브이스쿼트', '핵스쿼트', '펜듈럼', '런지', '스플릿', '스텝업', '데드리프트', '굿모닝', '힙쓰러스트', '레그 컬', '레그컬'],
+  내전근: ['이너타이', '내전', '어덕션', '어덕터', '와이드 스쿼트', '요가블럭'],
+  광배: ['랫 풀다운', '풀다운', '암풀다운', '로터리', '하이 로우', '풀오버', '맥그립', '로우'],
+  '등 중앙': ['로우', '하이 로우', '미드 로우', '로우 로우', '시티드 로우', '벤트오버', '페이스풀', '리버스 쉬러그'],
+  '중부 승모근': ['로우', '하이 로우', '미드 로우', '로우 로우', '시티드 로우', '벤트오버', '페이스풀', '리버스 쉬러그', '리어델트'],
+  '하부 승모근': ['리버스 쉬러그', '쉬러그', '페이스풀', 'Y레이즈', '와이 레이즈', '풀다운', '로우', '숄더 프레스'],
+  가슴: ['체스트', '벤치 프레스', '체스트 프레스', '펙덱', '플라이', '푸쉬업', '딥스'],
+  어깨: ['숄더', '프레스', '레터럴', '레이즈', '리어델트', '비하인드', '페이스풀', '업라이트'],
+  전거근: ['전거근', '푸쉬업', '월슬라이드', '월 슬라이드', '숄더 프레스', '프론트 숄더', 'Y레이즈', '와이 레이즈'],
+  팔: ['이두', '삼두', '바이셉', '트라이셉', '암 컬', '해머 컬', '로프 푸쉬다운', '푸쉬다운', '트라이셉 익스텐션'],
+  코어: ['플랭크', '데드버그', '크런치', '코어', '팔로프', '행잉', '레그레이즈'],
+  '전신 안정': ['플랭크', '데드버그', '팔로프', '캐리', '스쿼트', '런지', '스텝업', '푸쉬업'],
+};
+
+function normalizeSuggestionSearchText(value) {
+  return normalizeSuggestionBaseName(value)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesSelectedTarget(label, selectedTarget) {
+  const target = String(selectedTarget || '').trim();
+  if (!target) return true;
+
+  const parsed = splitExerciseDetails(label);
+  const base = normalizeSuggestionSearchText(parsed.base);
+  const details = normalizeSuggestionSearchText(parsed.details);
+  const hints = TARGET_SUGGESTION_HINTS[target] || [target];
+
+  if (details.includes(target)) return true;
+  return hints.some(hint => base.includes(normalizeSuggestionSearchText(hint)));
+}
+
 function hasExplicitNonMachineTool(label) {
   const { base } = splitExerciseDetails(label);
   return NON_MACHINE_TOOLS.some(tool => base.startsWith(`${tool} `));
@@ -515,10 +554,13 @@ async function loadExerciseSuggestions(q = '') {
 function filterExerciseSuggestions(q = '') {
   const query = String(q || '').trim();
   const selectedTool = exerciseToolSelect.value.trim();
+  const selectedTarget = exerciseTargetSelect.value.trim();
   const seen = new Set();
+  const normalizedQuery = normalizeSuggestionSearchText(query);
   const all = state.exerciseCatalog
     .map(item => suggestionForSelectedTool(item, selectedTool))
     .filter(Boolean)
+    .filter(item => matchesSelectedTarget(item, selectedTarget))
     .filter(item => {
       if (seen.has(item)) return false;
       seen.add(item);
@@ -527,7 +569,9 @@ function filterExerciseSuggestions(q = '') {
 
   if (!query) return all.slice(0, 20);
   const limit = query.length >= 2 ? 20 : 15;
-  return all.filter(item => item.includes(query)).slice(0, limit);
+  return all
+    .filter(item => item.includes(query) || normalizeSuggestionSearchText(item).includes(normalizedQuery))
+    .slice(0, limit);
 }
 
 function addExercise() {
@@ -781,6 +825,10 @@ exerciseInput.addEventListener('input', () => {
 });
 
 exerciseToolSelect.addEventListener('change', () => {
+  loadExerciseSuggestions(exerciseInput.value).catch(() => {});
+});
+
+exerciseTargetSelect.addEventListener('change', () => {
   loadExerciseSuggestions(exerciseInput.value).catch(() => {});
 });
 
