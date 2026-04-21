@@ -392,14 +392,49 @@ function findMovementMeta(exerciseName) {
   return null;
 }
 
+function isMachineTool(tool) {
+  return String(tool || '').trim() === '머신';
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeExerciseBaseName(name, tool) {
+  let clean = String(name || '').trim().replace(/\s+/g, ' ');
+  const cleanTool = String(tool || '').trim();
+  if (!clean || !cleanTool) return clean;
+
+  if (isMachineTool(cleanTool)) {
+    return clean
+      .replace(/^머신\s+/, '')
+      .replace(/\s*머신$/, '')
+      .trim();
+  }
+
+  return clean
+    .replace(new RegExp(`^${escapeRegExp(cleanTool)}\\s+`), '')
+    .trim();
+}
+
+function formatExerciseDisplayName({ tool = '', name = '', target = '', variant = '' }) {
+  const cleanTool = String(tool || '').trim();
+  const baseName = normalizeExerciseBaseName(name, cleanTool);
+  const details = [target, variant].filter(Boolean).join(', ');
+  const label = isMachineTool(cleanTool)
+    ? [baseName, cleanTool].filter(Boolean).join(' ')
+    : [cleanTool, baseName].filter(Boolean).join(' ');
+  return `${label}${details ? ` (${details})` : ''}`.trim();
+}
+
 function normalizeExerciseItem(item) {
   if (item && typeof item === 'object') {
-    const name = String(item.name || item.exercise || item.label || item.displayName || '').trim();
+    const rawName = String(item.name || item.exercise || item.label || item.displayName || '').trim();
     const tool = String(item.tool || item.equipment || '').trim();
     const target = String(item.target || item.primaryTarget || '').trim();
     const variant = String(item.variant || '').trim();
-    const details = [target, variant].filter(Boolean).join(', ');
-    const displayName = String(item.displayName || item.label || `${[tool, name].filter(Boolean).join(' ')}${details ? ` (${details})` : ''}`).trim();
+    const name = normalizeExerciseBaseName(rawName, tool);
+    const displayName = formatExerciseDisplayName({ tool, name, target, variant }) || String(item.displayName || item.label || rawName).trim();
     return { name: name || displayName, tool, target, variant, displayName: displayName || name };
   }
 
@@ -727,6 +762,8 @@ const CANONICAL_EXERCISE_NAMES = {
   '디클라인 펙덱플라이 머신': '디클라인 펙덱 플라이 머신',
   '덤벨 스티프 데드리프트 (둔근 및 대퇴이두)': '덤벨 스티프 데드리프트',
   '덤벨 싱글 스티프 데드리프트': '덤벨 싱글레그 스티프 데드리프트',
+  '머신 프론트 숄더 프레스': '프론트 숄더 프레스',
+  '프론트 숄더 프레스 머신': '프론트 숄더 프레스',
 };
 
 function canonicalExerciseName(name) {

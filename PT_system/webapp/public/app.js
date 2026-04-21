@@ -227,15 +227,50 @@ function exerciseDisplayName(item) {
   return item?.displayName || item?.label || item?.name || '';
 }
 
+function isMachineTool(tool) {
+  return String(tool || '').trim() === '머신';
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeExerciseBaseName(name, tool) {
+  let clean = String(name || '').trim().replace(/\s+/g, ' ');
+  const cleanTool = String(tool || '').trim();
+  if (!clean || !cleanTool) return clean;
+
+  if (isMachineTool(cleanTool)) {
+    return clean
+      .replace(/^머신\s+/, '')
+      .replace(/\s*머신$/, '')
+      .trim();
+  }
+
+  return clean
+    .replace(new RegExp(`^${escapeRegExp(cleanTool)}\\s+`), '')
+    .trim();
+}
+
+function formatExerciseDisplayName({ tool = '', name = '', target = '', variant = '' }) {
+  const cleanTool = String(tool || '').trim();
+  const baseName = normalizeExerciseBaseName(name, cleanTool);
+  const details = [target, variant].filter(Boolean).join(', ');
+  const label = isMachineTool(cleanTool)
+    ? [baseName, cleanTool].filter(Boolean).join(' ')
+    : [cleanTool, baseName].filter(Boolean).join(' ');
+  return `${label}${details ? ` (${details})` : ''}`.trim();
+}
+
 function buildExerciseItem() {
-  const name = exerciseInput.value.trim();
+  const rawName = exerciseInput.value.trim();
   const tool = exerciseToolSelect.value.trim();
   const target = exerciseTargetSelect.value.trim();
   const variant = exerciseVariantInput.value.trim();
-  if (!name) return null;
+  if (!rawName) return null;
 
-  const details = [target, variant].filter(Boolean).join(', ');
-  const displayName = `${[tool, name].filter(Boolean).join(' ')}${details ? ` (${details})` : ''}`.trim();
+  const name = normalizeExerciseBaseName(rawName, tool);
+  const displayName = formatExerciseDisplayName({ tool, name, target, variant });
   return { tool, name, target, variant, displayName };
 }
 
