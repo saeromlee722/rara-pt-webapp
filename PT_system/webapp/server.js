@@ -764,11 +764,55 @@ const CANONICAL_EXERCISE_NAMES = {
   '덤벨 싱글 스티프 데드리프트': '덤벨 싱글레그 스티프 데드리프트',
   '머신 프론트 숄더 프레스': '프론트 숄더 프레스',
   '프론트 숄더 프레스 머신': '프론트 숄더 프레스',
+  '머신 프론트 숄더 프레스 (어깨, 전거근 활성화)': '프론트 숄더 프레스 머신',
+  '머신 레그 프레스': '레그 프레스 머신',
+  '머신 레그 프레스 머신': '레그 프레스 머신',
+  '머신 힙 쓰러스트': '힙쓰러스트 머신',
+  '머신 힙 쓰러스트 머신': '힙쓰러스트 머신',
+  '힙 쓰러스트 머신': '힙쓰러스트 머신',
+  '머신 숄더 프레스': '숄더 프레스 머신',
+  '머신 바이킹 숄더 프레스': '바이킹 숄더 프레스 머신',
+  '머신 사이드 레터럴 레이즈': '사이드 레터럴 레이즈 머신',
+  '머신 사이들 레터럴 레이즈': '사이드 레터럴 레이즈 머신',
+  '사이들 레터럴 레이즈 머신': '사이드 레터럴 레이즈 머신',
+  '머신 브이스쿼트': '브이스쿼트 머신',
+  '머신 브이스쿼트 머신': '브이스쿼트 머신',
+  '머신 시티드 레그컬': '시티드 레그컬 머신',
+  '머신 펜듈럼 스쿼트': '펜듈럼 스쿼트 머신',
+  '머신 하이 로우': '하이 로우 머신',
+  '하이로우 머신': '하이 로우 머신',
+  '머신 로우 로우': '로우 로우 머신',
+  '언더그립 로우로우 머신': '언더그립 로우 로우 머신',
+  '머신 랫 풀다운': '랫 풀다운 머신',
+  '랫풀다운 머신': '랫 풀다운 머신',
+  '머신 풀오버': '풀오버 머신',
+  '머신 카프레이즈': '카프레이즈 머신',
+  '머신 힙 익스텐션': '힙 익스텐션 머신',
+  '머신 몬스터 글루트': '몬스터 글루트 머신',
+  '머신 몬스터 글루트 머신': '몬스터 글루트 머신',
 };
 
 function canonicalExerciseName(name) {
-  const clean = String(name || '').trim();
-  return CANONICAL_EXERCISE_NAMES[clean] || clean;
+  const clean = String(name || '').trim().replace(/\s+/g, ' ');
+  const direct = CANONICAL_EXERCISE_NAMES[clean];
+  if (direct) return direct;
+
+  const m = clean.match(/^(.+?)\s*\((.+)\)$/);
+  const base = m ? m[1].trim() : clean;
+  const details = m ? m[2].trim() : '';
+  const baseDirect = CANONICAL_EXERCISE_NAMES[base];
+  if (baseDirect) return details ? `${baseDirect} (${details})` : baseDirect;
+
+  if (/^머신\s+/.test(base)) {
+    const machineBase = base
+      .replace(/^머신\s+/, '')
+      .replace(/\s*머신$/, '')
+      .trim();
+    const normalized = machineBase ? `${machineBase} 머신` : base;
+    return details ? `${normalized} (${details})` : normalized;
+  }
+
+  return clean;
 }
 
 function getExerciseCatalog() {
