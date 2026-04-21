@@ -242,8 +242,8 @@ function normalizeExerciseBaseName(name, tool) {
 
   if (isMachineTool(cleanTool)) {
     return clean
-      .replace(/^머신\s+/, '')
-      .replace(/\s*머신$/, '')
+      .replace(/머신/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
@@ -286,7 +286,8 @@ function normalizeSuggestionBaseName(base) {
     .replace(/힙\s*쓰러스트/g, '힙쓰러스트')
     .replace(/힙익스텐션/g, '힙 익스텐션')
     .replace(/펙덱플라이/g, '펙덱 플라이')
-    .replace(/사이들 레터럴/g, '사이드 레터럴');
+    .replace(/사이들 레터럴/g, '사이드 레터럴')
+    .replace(/굿모닝\s*엑사사이즈/g, '굿모닝');
 }
 
 function hasExplicitNonMachineTool(label) {

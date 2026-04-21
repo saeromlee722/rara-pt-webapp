@@ -407,8 +407,8 @@ function normalizeExerciseBaseName(name, tool) {
 
   if (isMachineTool(cleanTool)) {
     return clean
-      .replace(/^머신\s+/, '')
-      .replace(/\s*머신$/, '')
+      .replace(/머신/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
@@ -790,6 +790,11 @@ const CANONICAL_EXERCISE_NAMES = {
   '머신 힙 익스텐션': '힙 익스텐션 머신',
   '머신 몬스터 글루트': '몬스터 글루트 머신',
   '머신 몬스터 글루트 머신': '몬스터 글루트 머신',
+  '브이스쿼트 머신 굿모닝': '브이스쿼트 굿모닝 머신',
+  '브이스퀏트 머신 굿모닝': '브이스쿼트 굿모닝 머신',
+  '브이스쿼트 굿모닝 머신': '브이스쿼트 굿모닝 머신',
+  '브이스퀏트 굿모닝 머신': '브이스쿼트 굿모닝 머신',
+  '굿모닝 엑사사이즈 머신': '굿모닝 머신',
 };
 
 function canonicalExerciseName(name) {
