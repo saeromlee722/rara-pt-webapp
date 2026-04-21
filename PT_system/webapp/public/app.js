@@ -326,12 +326,29 @@ function matchesSelectedTarget(label, selectedTarget) {
   const hints = TARGET_SUGGESTION_HINTS[target] || [target];
 
   if (details.includes(target)) return true;
-  return hints.some(hint => base.includes(normalizeSuggestionSearchText(hint)));
+  return hints.some(hint => suggestionTextIncludesHint(base, hint));
+}
+
+function suggestionTextIncludesHint(text, hint) {
+  const cleanText = normalizeSuggestionSearchText(text);
+  const cleanHint = normalizeSuggestionSearchText(hint);
+  if (!cleanHint) return false;
+
+  if (cleanHint === '로우') {
+    return cleanText.split(' ').includes('로우');
+  }
+
+  return cleanText.includes(cleanHint);
 }
 
 function hasExplicitNonMachineTool(label) {
   const { base } = splitExerciseDetails(label);
   return NON_MACHINE_TOOLS.some(tool => base.startsWith(`${tool} `));
+}
+
+function getExplicitTool(label) {
+  const { base } = splitExerciseDetails(label);
+  return EQUIPMENT_WORDS.find(tool => base.startsWith(`${tool} `)) || '';
 }
 
 function suggestionForSelectedTool(label, selectedTool) {
@@ -348,6 +365,8 @@ function suggestionForSelectedTool(label, selectedTool) {
     return details ? `${machineName} (${details})` : machineName;
   }
 
+  const explicitTool = getExplicitTool(cleanLabel);
+  if (explicitTool && explicitTool !== cleanTool) return '';
   if (base.includes('머신')) return '';
   const toolName = formatExerciseDisplayName({ tool: cleanTool, name: base });
   return details ? `${toolName} (${details})` : toolName;
