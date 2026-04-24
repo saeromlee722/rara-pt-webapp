@@ -351,25 +351,38 @@ function getExplicitTool(label) {
   return EQUIPMENT_WORDS.find(tool => base.startsWith(`${tool} `)) || '';
 }
 
+function getCoreMovementName(label) {
+  const cleanLabel = String(label || '').trim();
+  if (!cleanLabel) return '';
+
+  const { base } = splitExerciseDetails(cleanLabel);
+  const explicitTool = getExplicitTool(cleanLabel);
+  let coreName = normalizeSuggestionBaseName(base);
+
+  if (explicitTool) {
+    coreName = normalizeExerciseBaseName(coreName, explicitTool);
+  }
+
+  return normalizeExerciseBaseName(coreName, '머신');
+}
+
 function suggestionForSelectedTool(label, selectedTool) {
   const cleanTool = String(selectedTool || '').trim();
   const cleanLabel = String(label || '').trim();
-  if (!cleanTool) return cleanLabel;
+  const coreName = getCoreMovementName(cleanLabel);
+  if (!cleanTool) return coreName;
 
   const parsed = splitExerciseDetails(cleanLabel);
   const base = normalizeSuggestionBaseName(parsed.base);
-  const details = parsed.details;
   if (isMachineTool(cleanTool)) {
     if (hasExplicitNonMachineTool(cleanLabel)) return '';
-    const machineName = formatExerciseDisplayName({ tool: cleanTool, name: base });
-    return details ? `${machineName} (${details})` : machineName;
+    return coreName;
   }
 
   const explicitTool = getExplicitTool(cleanLabel);
   if (explicitTool && explicitTool !== cleanTool) return '';
   if (base.includes('머신')) return '';
-  const toolName = formatExerciseDisplayName({ tool: cleanTool, name: base });
-  return details ? `${toolName} (${details})` : toolName;
+  return coreName;
 }
 
 function buildExerciseItem() {
